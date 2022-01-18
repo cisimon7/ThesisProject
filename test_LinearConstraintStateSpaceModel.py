@@ -6,8 +6,8 @@ from LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
 
 class TestLinearConstraintStateSpaceModel(TestCase):
 
-    def setUp(self) -> None:
-        self.rnd_system = LinearConstraintStateSpaceModel(
+    def test_system1(self):
+        system = LinearConstraintStateSpaceModel(
             A=np.eye(4),
             B=np.array([
                 [0, 1 / 67, 0, 1 / 67],
@@ -15,14 +15,28 @@ class TestLinearConstraintStateSpaceModel(TestCase):
                 [0, 7 / 67, 0, 7 / 67],
                 [0, 1 / 67, 0, 1 / 67]
             ]),
-            # G=np.array([[1, 4, 2, 1], [3, 3, 1, 2], [0, 1, 0, 4]]),
-            G=np.array([[1, 0, -1, 1], [0, 1, 1, 1], [1, 1, 0, 2], [2, 3, 1, 5]]),
-            F=np.eye(4, 6)
+            G=np.array([[1, 4, 2, 1], [3, 3, 1, 2], [0, 1, 0, 4]]),
+            # G=np.array([[1, 0, -1, 1], [0, 1, 1, 1], [1, 1, 0, 2], [2, 3, 1, 5]]),
+            F=np.eye(4, 6),
+            init_state=10 * np.array([1, 1, 1, 1])
         )
+        system.ode_gain_solve(time_space=np.linspace(0, 10, int(2E3)))
+        system.plot_states()
 
-    def test_zdot_gain(self):
-        self.skipTest("Not yet implemented")
+    def test_system2(self):
+        system = LinearConstraintStateSpaceModel(
+            A=np.eye(4),
+            B=np.eye(4),
+            G=np.array([
+                [1, 4, 2, 1],
+                [3, 3, 1, 2],
+                [0, 1, 0, 4]
+            ]),
+            F=np.eye(4, 6),
+            init_state=10 * np.array([1, 1, 1, 1])
+        )
+        system.ode_gain_solve(time_space=np.linspace(0, 10, int(2E3)))
+        system.plot_states()
 
-    def test_ode_gain_solve(self):
-        self.rnd_system.ode_gain_solve()
-        self.assertTrue(True)
+    def test_system3(self):
+        pass

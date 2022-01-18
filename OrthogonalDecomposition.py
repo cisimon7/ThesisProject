@@ -83,14 +83,14 @@ def svd_4subspaces(mat: np.ndarray):
     rank = matrix_rank(mat)
     U, s, V = svd(mat, full_matrices=True)
 
-    # Row       # Column    # Left-Null # Null
-    return U[:, :rank], V[:rank, :], U[:, :rank], V[rank:, :]
+    # Row    # Column   # Left-Null  # Null
+    return V[:rank, :], U[:, :rank], U[:, rank:], V[rank:, :]
 
 
 # TEST: SVD decomposition should be able to return the 4 sub spaces, and all orthornomal
-a = np.random.randn(5, 7)
-row, col, left_null, null = svd_4subspaces(a)
-all([is_orthonormal(basis) for basis in [row, col, left_null, null]])
+# a = np.random.randn(5, 7)
+# row, col, left_null, null = svd_4subspaces(a)
+# all([is_orthonormal(basis) for basis in [row, col, left_null, null]])
 
 
 def projection_vector(span, vector):

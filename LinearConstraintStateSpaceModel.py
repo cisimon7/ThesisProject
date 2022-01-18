@@ -75,9 +75,9 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         ) if (gain is None) else gain
         self.__assert_gain_size(_gain)
 
-        # result = (N.T @ (A - B @ _gain) @ N @ z) + (N.T @ A @ R @ zeta)
-        # result = (N @ A @ N.T @ z) - (N @ B @ _gain @ z)
-        result = (N @ (A @ N.T + B @ _gain) @ z) + (N @ A @ R @ zeta)
+        _gain_zeta = - np.linalg.pinv(N @ B) @ N @ A @ R.T @ zeta
+
+        result = (N @ (A @ N.T + B @ _gain) @ z) + (N @ B @ _gain_zeta) + (N @ A @ R.T @ zeta)
         return result
 
     def ode_gain_solve(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
@@ -95,7 +95,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
             [self.zdot_gain(state, time=t, gain=gain) for (t, state) in zip(self.time, result)]
         ).transpose()
 
-        self.states = self.N.T @ z_states + np.asarray([self.R @ self.zeta for _ in range(z_states.shape[1])]).T
+        self.states = self.N.T @ z_states + np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
         self.d_states = self.N.T @ d_z_states
 
         return result
