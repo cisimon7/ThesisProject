@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 from plotly.subplots import make_subplots
 
 
-class ControlSystem:
+class LinearStateSpaceModel:
 
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, init_state: Optional[np.ndarray] = None):
@@ -61,22 +61,26 @@ class ControlSystem:
 
         self.__assert_state_size(state)
         self.__assert_control_size(_gain)
+
         return (self.A - self.B @ _gain) @ state
 
     def output(self):
         assert (self.C is not None), "System Output Matrix C not set"
         pass
 
-    def gain_lqr(self, Q=None, R=None) -> np.ndarray:
+    def gain_lqr(self, A=None, B=None, Q=None, R=None) -> np.ndarray:
         """Returns optimal controller gain given the state and input weight matrix"""
 
         _Q = np.eye(self.state_size) if (Q is None) else Q  # Initialized to identity matrix to give equal weights
         _R = np.eye(self.control_size) if (R is None) else R  # Initialized to identity matrix to give equal weights
 
-        assert (_Q.shape[0] == _Q.shape[1] == self.state_size), "State Weight cannot be multiplied with state vector"
+        _A = self.A if (A is None) else A
+        _B = self.B if (B is None) else B
+
+        assert (_Q.shape[0] == _Q.shape[1] == _A.shape[0]), "State Weight cannot be multiplied with state vector"
         assert (_R.shape[0] == _R.shape[1] == self.control_size), "Input Weight cannot be multiplied with state vector"
 
-        gain, _, _ = lqr(self.A, self.B, _Q, _R)
+        gain, _, _ = lqr(_A, _B, _Q, _R)
 
         return gain
 
@@ -129,6 +133,11 @@ class ControlSystem:
     def __assert_control_size(self, control: np.ndarray):
         k = control.shape[0]
         assert (k == self.control_size), "Control Vector shape error"
+
+    def __assert_gain_size(self, gain: np.ndarray):
+        (k, l) = gain.shape
+        assert (k == self.control_size), "Gain Vector shape error"
+        assert (l == self.state_size), "Gain Vector shape error"
 
     def __assert_state_size(self, state: np.ndarray):
         k = state.shape[0]
