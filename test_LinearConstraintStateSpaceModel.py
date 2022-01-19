@@ -65,7 +65,7 @@ class TestLinearConstraintStateSpaceModel(TestCase):
                 [1, 2, 3]
             ]),
             F=np.eye(3, 6),
-            init_state=5 * np.random.randn(3)
+            init_state=np.array([3, 5, 10])
         )
         system.ode_gain_solve(time_space=np.linspace(0, 20, int(2E3)))
         system.plot_states()
@@ -82,7 +82,7 @@ class TestLinearConstraintStateSpaceModel(TestCase):
             F=np.eye(3, 6),
             init_state=2 * np.random.randn(3)
         )
-        system.ode_gain_solve(time_space=np.linspace(0, 20, int(2E3)))
+        system.ode_gain_solve(time_space=np.linspace(0, 60, int(2E3)))
         system.plot_states()
 
     def test_rand_system(self):

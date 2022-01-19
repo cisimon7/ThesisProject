@@ -55,11 +55,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
         (z, zeta) = (state, self.zeta)
-
-        A = self.A
-        B = self.B
-        N = self.N
-        R = self.R
+        (A, B, N, R) = (self.A, self.B, self.N, self.R)
 
         self.__assert_state_size(z)
         self.__assert_zeta_size(zeta)
@@ -95,8 +91,13 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
             [self.zdot_gain(state, time=t, gain=gain) for (t, state) in zip(self.time, result)]
         ).transpose()
 
-        self.states = self.N.T @ z_states + np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
-        self.d_states = self.N.T @ d_z_states
+        adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(3, 1)
+        init_d_state = self.xdot_gain(self.init_state, 0, np.zeros(self.control_size))
+        d_adjust = np.divide(init_d_state, self.N.T @ d_z_states[:, 0]).reshape(3, 1)
+
+        self.states = np.multiply(adjust, self.N.T) @ z_states + \
+                      np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
+        self.d_states = np.multiply(d_adjust, self.N.T) @ d_z_states
 
         return result
 
