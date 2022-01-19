@@ -21,21 +21,18 @@ class LinearStateSpaceModel:
         assert (k == n), "System Matrix B cannot be added to system change"
         self.control_size = l
 
-        if C is not None:
-            (k, l) = C.shape
-            assert (l == n), "System Matrix C cannot be multiplied by state vector"
-            self.output_size = k
+        C = np.eye(self.state_size) if C is None else C
 
-        if D is not None:
-            (k, l) = D.shape
-            assert (k == self.output_size), "System Matrix D cannot be added to output change"
-            assert (l == self.control_size), "System Matrix D cannot be multiplied by control vector"
-
+        (k, l) = C.shape
+        assert (l == n), "System Matrix C cannot be multiplied by state vector"
+        self.output_size = k
         self.C = C
-        self.D = D
 
-        self.state: np.ndarray = np.zeros(self.state_size)  # Initialize state vector to zero
-        self.control: np.ndarray = np.zeros(self.control_size)  # Initialize control vector to zero
+        D = np.zeros((self.output_size, self.control_size)) if D is None else D
+        (k, l) = D.shape
+        assert (k == self.output_size), "System Matrix D cannot be added to output change"
+        assert (l == self.control_size), "System Matrix D cannot be multiplied by control vector"
+        self.D = D
 
         # Default simulation time
         self.time: np.ndarray = np.linspace(0, 10, int(2E3))
@@ -46,6 +43,9 @@ class LinearStateSpaceModel:
         self.states: Optional[np.ndarray] = None  # Holds values of state after simulation with odeint
         self.d_states: Optional[np.ndarray] = None  # Holds values of state derivative after simulation with odeint
 
+        self.controller = None
+        self.output_states = None
+
     def xdot(self, state: np.ndarray, time: float, control: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and control input"""
 
@@ -53,7 +53,7 @@ class LinearStateSpaceModel:
         self.__assert_control_size(control)
         return (self.A @ state) + (self.B @ control)
 
-    def xdot_gain(self, state: np.ndarray, time: float, gain: np.ndarray = None) -> np.ndarray:
+    def x_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray = None) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
         # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
@@ -64,9 +64,11 @@ class LinearStateSpaceModel:
 
         return (self.A - self.B @ _gain) @ state
 
-    def output(self):
-        assert (self.C is not None), "System Output Matrix C not set"
-        pass
+    def output(self) -> np.ndarray:
+        assert (self.controller is not None), "Controller not defined yet"
+        result = self.C @ self.states + self.D @ self.controller
+        self.output_states = result
+        return result
 
     def gain_lqr(self, A=None, B=None, Q=None, R=None) -> np.ndarray:
         """Returns optimal controller gain given the state and input weight matrix"""
@@ -78,7 +80,7 @@ class LinearStateSpaceModel:
         _B = self.B if (B is None) else B
 
         assert (_Q.shape[0] == _Q.shape[1] == _A.shape[0]), "State Weight cannot be multiplied with state vector"
-        assert (_R.shape[0] == _R.shape[1] == self.control_size), "Input Weight cannot be multiplied with state vector"
+        assert (_R.shape[0] == _R.shape[1] == _B.shape[1]), "Input Weight cannot be multiplied with state vector"
 
         gain, _, _ = lqr(_A, _B, _Q, _R)
 
@@ -94,12 +96,16 @@ class LinearStateSpaceModel:
         _init_state = self.init_state if (init_state is None) else init_state
 
         gain = params['gain']
-        result = odeint(self.xdot_gain, _init_state, self.time, args=(gain,), printmessg=verbose)
+        result = odeint(self.x_dot_gain, _init_state, self.time, args=(gain,), printmessg=verbose)
 
         self.states = np.asarray(result).transpose()
         self.d_states = np.asarray(
-            [self.xdot_gain(state, time=t, gain=gain) for (t, state) in zip(self.time, result)]
+            [self.x_dot_gain(state, time=t, gain=gain) for (t, state) in zip(self.time, result)]
         ).transpose()
+
+        # u = -K x
+        self.controller = - gain @ self.states
+        self.output()
 
         return result
 
@@ -124,11 +130,24 @@ class LinearStateSpaceModel:
 
         fig.update_layout(showlegend=False, height=800).show()
 
-    def plot_controller(self):
-        pass
+    def plot_controller(self, title="Controller Plot"):
+        print(self.controller.shape)
+        go.Figure(
+            data=[go.Scatter(x=self.time, y=cont, name=f'control input [{i}]') for (i, cont) in
+                  enumerate(self.controller)],
+            layout=go.Layout(showlegend=True, title=title, legend=dict(orientation='h'),
+                             xaxis=dict(title='time'), yaxis=dict(title='controller size'),
+                             width=1000, height=700)
+        ).show()
 
-    def plot_output(self):
-        pass
+    def plot_output(self, title="Output Plot"):
+        go.Figure(
+            data=[go.Scatter(x=self.time, y=output, name=f'output state [{i}]') for (i, output) in
+                  enumerate(self.output_states)],
+            layout=go.Layout(showlegend=True, title=title, legend=dict(orientation='h'),
+                             xaxis=dict(title='time'), yaxis=dict(title='output states'),
+                             width=1000, height=700)
+        ).show()
 
     def __assert_control_size(self, control: np.ndarray):
         k = control.shape[0]

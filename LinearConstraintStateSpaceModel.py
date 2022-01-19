@@ -1,5 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
+from control import lqr
 from scipy.integrate import odeint
 from plotly.subplots import make_subplots
 from typing import Optional, List, Tuple, Dict, Any
@@ -49,9 +50,9 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         self.R = row_G
 
         self.zeta = np.zeros(self.rank_G)  # To be implemented later
+        self.gain = None
 
-    # state has to be passed as tuple in order to be used in scipy.integrate.odeint
-    def zdot_gain(self, state: np.ndarray, time: float, gain: np.ndarray = None) -> np.ndarray:
+    def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
         (z, zeta) = (state, self.zeta)
@@ -59,45 +60,60 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         self.__assert_state_size(z)
         self.__assert_zeta_size(zeta)
-
-        # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
-        # This is not an efficient implementation as function would be called multiple times and lqr and multiplication
-        # are going to be repeatedly called
-        _gain = self.gain_lqr(
-            A=(N @ A @ N.T),
-            B=(N @ B),
-            Q=np.eye(self.state_size - self.rank_G),
-            R=np.eye(self.control_size)
-        ) if (gain is None) else gain
-        self.__assert_gain_size(_gain)
+        self.__assert_gain_size(gain)
 
         _gain_zeta = - np.linalg.pinv(N @ B) @ N @ A @ R.T @ zeta
 
-        result = (N @ (A @ N.T + B @ _gain) @ z) + (N @ B @ _gain_zeta) + (N @ A @ R.T @ zeta)
+        result = (N @ (A @ N.T + B @ gain) @ z) + (N @ B @ _gain_zeta) + (N @ A @ R.T @ zeta)
         return result
+
+    def gain_lqr(self, A=None, B=None, Q=None, R=None):
+        N = self.N
+
+        _Q = np.eye(self.state_size - self.rank_G) if (Q is None) else Q
+        _R = np.eye(self.control_size) if (R is None) else R
+
+        _A = (N @ self.A @ N.T) if (A is None) else A
+        _B = (N @ self.B) if (B is None) else B
+
+        gain = super().gain_lqr(_A, _B, _Q, _R)
+        self.gain = gain
+        return gain
 
     def ode_gain_solve(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
                        time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
 
+        (A, B, N, R) = (self.A, self.B, self.N, self.R)
         self.time = time_space
+
         _init_state = self.init_state if (init_state is None) else init_state
         _init_state = self.N @ _init_state
 
         gain = params['gain']
-        result = odeint(self.zdot_gain, _init_state, self.time, args=(gain,), printmessg=verbose)
+
+        # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
+        _gain = self.gain_lqr() if (gain is None) else gain
+        self.gain = _gain
+
+        result = odeint(self.z_dot_gain, _init_state, self.time, args=(_gain,), printmessg=verbose)
 
         z_states = np.asarray(result).transpose()
         d_z_states = np.asarray(
-            [self.zdot_gain(state, time=t, gain=gain) for (t, state) in zip(self.time, result)]
+            [self.z_dot_gain(state, time=t, gain=_gain) for (t, state) in zip(self.time, result)]
         ).transpose()
 
-        adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(3, 1)
-        init_d_state = self.xdot_gain(self.init_state, 0, np.zeros(self.control_size))
-        d_adjust = np.divide(init_d_state, self.N.T @ d_z_states[:, 0]).reshape(3, 1)
+        adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(self.state_size, 1)
+        init_d_state = self.x_dot_gain(self.init_state, 0, np.zeros(self.control_size))
+        d_adjust = np.divide(init_d_state, self.N.T @ d_z_states[:, 0]).reshape(self.state_size, 1)
 
         self.states = np.multiply(adjust, self.N.T) @ z_states + \
                       np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
         self.d_states = np.multiply(d_adjust, self.N.T) @ d_z_states
+
+        self.controller = - _gain @ self.N @ self.states
+        self.output()
+
+        print(self.controller.shape)
 
         return result
 

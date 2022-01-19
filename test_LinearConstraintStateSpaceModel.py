@@ -84,6 +84,8 @@ class TestLinearConstraintStateSpaceModel(TestCase):
         )
         system.ode_gain_solve(time_space=np.linspace(0, 60, int(2E3)))
         system.plot_states()
+        system.plot_controller()
+        system.plot_output()
 
     def test_rand_system(self):
         A = np.random.randn(3, 3)

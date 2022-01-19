@@ -18,3 +18,5 @@ if __name__ == '__main__':
         time_space=np.linspace(0, 20, int(2E3))
     )
     mass_spring.plot_states()
+    mass_spring.plot_controller()
+    mass_spring.plot_output()
