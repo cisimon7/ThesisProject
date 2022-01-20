@@ -35,7 +35,7 @@ class LinearStateSpaceModel:
         self.D = D
 
         # Default simulation time
-        self.time: np.ndarray = np.linspace(0, 10, int(2E3))
+        self.time: np.ndarray = np.linspace(0, 10, int(20))
 
         # Initial state of the system
         self.init_state: Optional[np.ndarray] = np.zeros(self.state_size) if (init_state is None) else init_state
@@ -136,8 +136,7 @@ class LinearStateSpaceModel:
             data=[go.Scatter(x=self.time, y=cont, name=f'control input [{i}]') for (i, cont) in
                   enumerate(self.controller)],
             layout=go.Layout(showlegend=True, title=title, legend=dict(orientation='h'),
-                             xaxis=dict(title='time'), yaxis=dict(title='controller size'),
-                             width=1000, height=700)
+                             xaxis=dict(title='time'), yaxis=dict(title='controller size'))
         ).show()
 
     def plot_output(self, title="Output Plot"):
@@ -145,8 +144,7 @@ class LinearStateSpaceModel:
             data=[go.Scatter(x=self.time, y=output, name=f'output state [{i}]') for (i, output) in
                   enumerate(self.output_states)],
             layout=go.Layout(showlegend=True, title=title, legend=dict(orientation='h'),
-                             xaxis=dict(title='time'), yaxis=dict(title='output states'),
-                             width=1000, height=700)
+                             xaxis=dict(title='time'), yaxis=dict(title='output states'))
         ).show()
 
     def __assert_control_size(self, control: np.ndarray):

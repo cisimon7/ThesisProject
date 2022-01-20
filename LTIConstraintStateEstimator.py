@@ -25,6 +25,7 @@ class ZDotHatParams:
 class LTIConstraintStateEstimator:
 
     def __init__(self, system: LinearConstraintStateSpaceModel):
+        system.ode_gain_solve()
         self.system = system
         (z, zeta) = (system.init_state, system.zeta)
         (N, R) = (system.N, system.R)
@@ -36,49 +37,84 @@ class LTIConstraintStateEstimator:
         self.init_state = np.block([[system.init_state, system.zeta]])
 
         self.A = np.block([
-            [N @ A @ N.T, N @ A @ R],
-            [np.zeros((1, l)), np.zeros((1, r))]
+            [N @ A @ N.T, N @ A @ R.T],
+            [np.zeros((r, l)), np.zeros((r, r))]
         ])
 
         self.B = np.block([
             [N @ B],
-            [np.zeros((1, r))]
+            [np.zeros((r, system.control_size))]
         ])
 
-        self.C = C @ np.block([[N, R]])
+        self.C = C @ np.block([[N.T, R.T]])
 
         self.D = system.D
 
-    def z_dot_hat_gain(self, estimator_state: EstimatorState, time: float, gain: np.ndarray) -> EstimatorState:
+        self.init_state = np.r_[system.init_z_state, system.zeta]
+        self.x_prev = self.system.init_state
+
+        self.output = np.array([])
+        self.t_prev = -self.system.time[0]
+
+    def z_dot_hat_gain(self, estimator_input: np.ndarray, time, gain: np.ndarray) -> np.ndarray:
         """Returns an estimate of the state vector derivative vector at a given state and controller gain"""
 
-        (state_hat, output) = estimator_state
+        (state_hat, y_actual) = (estimator_input[:self.system.state_size], estimator_input[self.system.state_size:])
         (A, B, C, D) = (self.A, self.B, self.C, self.D)
-        state_estimate = A @ state_hat + B + gain @ (output - C @ state_hat)
 
-        # In reality, this is gotten freely
-        y = self.system.states[np.where(self.system.time == time)]  # + noise
-        return EstimatorState(state=state_estimate, output=y)
+        control_ff = - self.system.gain @ state_hat[:self.system.state_size - self.system.rank_G]
 
-    def estimator(self, params: ZDotHatParams = ZDotHatParams(gain=None), verbose=False):
-        _gain = lqr(
+        state_estimate = (A @ state_hat) + (B @ control_ff) + gain @ (y_actual - C @ state_hat)
+
+        x = self.system.state_time_solve(init_state=self.x_prev.ravel(), prev_time=self.t_prev, current_time=time)
+        x = x.T[-1]
+        self.x_prev = x
+
+        # Won't be derived in real life, it is measured, and it contains errors
+        y_actual = (self.system.C @ x) - (self.system.D @ self.system.gain @ x[:self.system.state_size - self.system.rank_G])
+        self.output = np.vstack((self.output, y_actual.flatten()))
+
+        result = np.r_[state_estimate, y_actual.ravel()]
+        return result
+
+    def estimate(self, params: ZDotHatParams = ZDotHatParams(gain=None), verbose=False):
+        _gain, _, _ = lqr(
             self.A,
             self.C,
             np.eye(self.A.shape[0]),
             np.eye(self.C.shape[1])
         ) if params.gain is None else params.gain
 
-        self.system.ode_gain_solve()
+        x0 = self.system.init_state
+        control_ff = - self.system.gain @ x0[:self.system.state_size - self.system.rank_G]
+        y0 = (self.system.C @ x0) + (self.system.D @ control_ff)
+        self.output = y0
 
         state_hat = odeint(
             func=self.z_dot_hat_gain,
-            y0=EstimatorState(state=self.init_state, output=np.zeros(self.system.output_size)),
+            y0=np.r_[x0, y0],
             t=self.system.time,
             args=(_gain,),
             printmessg=verbose
         )
 
+        # go.Figure(
+        #     data=[go.Scatter(x=self.system.time, y=state, mode='lines') for state in
+        #           state_hat.T[:self.system.state_size]],
+        #     layout=go.Layout()
+        # ).show()
+        #
+        # go.Figure(
+        #     data=[go.Scatter(x=self.system.time, y=values, mode='lines') for
+        #           values in self.system.states],
+        #     layout=go.Layout()
+        # ).show()
+
         go.Figure(
-            data=[go.Scatter(x=self.system.time, y=state) for state in state_hat]
+            data=[go.Scatter(x=self.system.time, y=output, name=f'output state [{i}]') for (i, output) in
+                  enumerate(self.output.T)],
+            layout=go.Layout(showlegend=True, title="Estimate Output", legend=dict(orientation='h'),
+                             xaxis=dict(title='time'), yaxis=dict(title='output states'))
         ).show()
 
+        self.system.plot_output()
