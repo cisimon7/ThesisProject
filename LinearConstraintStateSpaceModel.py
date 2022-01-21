@@ -125,7 +125,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         ).transpose()
 
         adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(self.state_size, 1)
-        init_d_state = self.x_dot_gain(self.init_state, 0, np.zeros(self.control_size))
+        init_d_state = self.x_dot_gain(self.init_state, 0, _gain)
         d_adjust = np.divide(init_d_state, self.N.T @ d_z_states[:, 0]).reshape(self.state_size, 1)
 
         self.states = np.multiply(adjust, self.N.T) @ z_states + \

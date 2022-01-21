@@ -1,5 +1,5 @@
 import numpy as np
-from control import lqr
+from control import lqr, lqe
 from dataclasses import dataclass
 from scipy.integrate import odeint
 from typing import List, Tuple, Dict, Any, Optional
@@ -70,7 +70,7 @@ class LTIConstraintStateEstimator:
         x = x.T[-1]
         self.x_prev = x
 
-        # Won't be derived in real life, it is measured, and it contains errors
+        # Won't be derived in real life, it is measured, and it contains errors or is the output of the kalman filter
         y_actual = (self.system.C @ x) - (self.system.D @ self.system.gain @ x[:self.system.state_size - self.system.rank_G])
         self.output = np.vstack((self.output, y_actual.flatten()))
 
@@ -78,8 +78,9 @@ class LTIConstraintStateEstimator:
         return result
 
     def estimate(self, params: ZDotHatParams = ZDotHatParams(gain=None), verbose=False):
-        _gain, _, _ = lqr(
+        _gain, _, _ = lqe(
             self.A,
+            np.eye(self.A.shape[0]),
             self.C,
             np.eye(self.A.shape[0]),
             np.eye(self.C.shape[1])
