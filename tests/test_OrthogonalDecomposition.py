@@ -1,4 +1,8 @@
 from unittest import TestCase
+
+import numpy as np
+from numpy.testing import assert_array_equal, assert_almost_equal
+
 from OrthogonalDecomposition import *
 
 
@@ -33,15 +37,59 @@ class TestOrthogonalDecomposition(TestCase):
             for vector in [rnd_vec_from_basis(intersection) for _ in range(1_000)]
         ]))
 
+    def test_subspaces_are_orthogonal(self):
+        G = np.array([[1, 4, 2, 1], [3, 3, 1, 2], [0, 1, 0, 4]])
+        R, C, LN, N = subspaces_from_svd(G)  # the fundamental subspaces gotten from svd are orthogonal basis
 
-"""## Proves"""
+        self.assertTrue(is_orthonormal(R))  # Row Space
+        self.assertTrue(is_orthonormal(C))  # Column Space
+        # self.assertTrue(is_orthonormal(LN))  # Left Null Space is empty in this case
+        self.assertTrue(is_orthonormal(N))  # Null Space
 
-# G = 100 * np.random.randn(5, 5)
-# x_ = 100 * np.random.randn(5)
-# R, _, _, N = svd_4subspaces(G)
+    def test_pseudo_inverse_of_orthonormal_matrices_equals_transpose(self):
+        G = np.array([[1, 4, 2, 1], [3, 3, 1, 2], [0, 1, 0, 4]])
+        R, C, LN, N = subspaces_from_svd(G)  # from previous test, the fundamental subspaces from svd are orthogonal
 
-# print(projection_matrix(R).round(4) == (R @ R.T).round(4))
+        assert_almost_equal(
+            np.linalg.pinv(R),
+            R.T
+        )
 
-# projection_matrix(N).round(4) == (N@N.T).round(4)
+        assert_almost_equal(
+            np.linalg.pinv(N),
+            N.T
+        )
 
-# print(x_.round(4) == (R @ R.T @ x_).round(4))  # + (N@N.T@x).round(4)
+        assert_almost_equal(
+            np.linalg.pinv(C),
+            C.T
+        )
+
+    def test_projection_matrix_of_orthonormal_basis_equals_product_matrix_and_its_transpose(self):
+        G = np.array([[1, 4, 2, 1], [3, 3, 1, 2], [0, 1, 0, 4]])
+        R, _, _, N = subspaces_from_svd(G)  # The subspaces are orthonormal matrices
+
+        # Testing projection into row space of RowSpace basis
+        assert_almost_equal(
+            R.T @ np.linalg.inv(R @ R.T) @ R,
+            (R.T @ R)
+        )
+
+        # Testing projection to the null space
+        assert_almost_equal(
+            np.eye(4) - R.T @ np.linalg.inv(R @ R.T) @ R,
+            (N.T @ N)
+        )
+
+    def test_decomposing_vector_into_row_and_null_space(self):
+        G = np.array([[1, 4, 2, 1], [3, 3, 1, 2], [0, 1, 0, 4]])
+        x_ = 10 * np.random.randn(4)
+        R, _, _, N = subspaces_from_svd(G)
+
+        z = N @ x_
+        zeta = R @ x_
+
+        assert_almost_equal(
+            x_,
+            (N.T @ z) + (R.T @ zeta)
+        )

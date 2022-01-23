@@ -1,5 +1,6 @@
 import numpy as np
 import sympy as sp
+from numpy.testing import assert_almost_equal
 from scipy.linalg import orth, svd
 
 
@@ -20,19 +21,25 @@ def transpose_inverse(mat: np.ndarray) -> bool:
 
 def is_orthonormal(mat: np.ndarray) -> bool:
     """
+    A square matrix P is called an orthogonal projector (or projection matrix) if it is both idempotent and symmetric,
+    that is, P2 = P and P′ = P
     Implementation also returns true if matrix is only Semi-Orthogonal
     Implemented this way to take care of the floating point precision
     """
     Q = np.asarray(mat)
     (x, y) = Q.shape
 
+    assert (x != 0 and y != 0), "Matrix of size zero can't be checked for orthogonality"
+
+    # assert_almost_equal(Q **2 , Q)
+
     if np.sum(
             np.square(np.eye(x).flatten() - (Q @ Q.T).flatten())
-    ) < (1e-4): return True
+    ) < 1e-4: return True
 
     if np.sum(
             np.square(np.eye(y).flatten() - (Q @ Q.T).flatten())
-    ) < (1e-4): return True
+    ) < 1e-4: return True
 
     return False
 
@@ -79,7 +86,8 @@ def subspaces_from_svd(mat: np.ndarray):
     U, s, V = svd(mat, full_matrices=True)
 
     # Row    # Column   # Left-Null  # Null
-    return V[:rank, :], U[:, :rank], U[:, rank:], V[rank:, :]
+    # return map(lambda matrix: matrix_rref(matrix), [V[:rank, :], U[:, :rank], U[:, rank:], V[rank:, :]])
+    return [V[:rank, :], U[:, :rank], U[:, rank:], V[rank:, :]]
 
 
 def projection_vector(span, vector):
