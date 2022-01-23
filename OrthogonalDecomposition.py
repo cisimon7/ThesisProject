@@ -45,11 +45,6 @@ def rnd_orth(size: int) -> np.ndarray:
     return orth(a)  # Uses SVD
 
 
-all([is_orthonormal(rnd_orth(4)) for _ in range(10_000)])
-
-"""## Rank and Subspaces"""
-
-
 def matrix_orth(mat: np.ndarray) -> np.ndarray:
     """Returns Orthonormal basis for the matrix"""
     return orth(mat)
@@ -78,7 +73,7 @@ def row_space_basis(mat: np.ndarray) -> np.ndarray:
     return col_space_basis(mat.T).T
 
 
-def svd_4subspaces(mat: np.ndarray):
+def subspaces_from_svd(mat: np.ndarray):
     """Returns orthognal basis for the four fundamental subspaces"""
     rank = matrix_rank(mat)
     U, s, V = svd(mat, full_matrices=True)
@@ -87,16 +82,10 @@ def svd_4subspaces(mat: np.ndarray):
     return V[:rank, :], U[:, :rank], U[:, rank:], V[rank:, :]
 
 
-# TEST: SVD decomposition should be able to return the 4 sub spaces, and all orthornomal
-# a = np.random.randn(5, 7)
-# row, col, left_null, null = svd_4subspaces(a)
-# all([is_orthonormal(basis) for basis in [row, col, left_null, null]])
-
-
 def projection_vector(span, vector):
     u = span
     v = vector
-    return (u.v) / (u.u) * u
+    return u.v / u.u * u
 
 
 def projection_matrix(mat: np.ndarray):
@@ -117,7 +106,7 @@ def intersection_basis(subspace1: np.ndarray, subspace2: np.ndarray) -> np.ndarr
 def rnd_vec_from_basis(basis: np.ndarray) -> np.ndarray:
     (x, y) = basis.shape
     vec = np.random.randint(0, 10, x)
-    return (basis @ vec)
+    return basis @ vec
 
 
 def is_vec_in_span(span, vec) -> bool:
@@ -146,26 +135,3 @@ def is_vec_in_span(span, vec) -> bool:
     ]): return False  # Case of No Solution
 
     return True
-
-
-# Testing with Random Orthornomal Basis Matrices
-# a = rnd_orth(5)
-# b = rnd_orth(5)
-# intsc = intersection_basis(a, b)
-#
-# all([is_vec_in_span(span, vector)
-#      for span in [a, b]
-#      for vector in [rnd_vec_from_basis(intsc) for _ in range(1_000)]
-#      ])
-
-"""## Proves"""
-
-# G = 100 * np.random.randn(5, 5)
-# x_ = 100 * np.random.randn(5)
-# R, _, _, N = svd_4subspaces(G)
-
-# print(projection_matrix(R).round(4) == (R @ R.T).round(4))
-
-# projection_matrix(N).round(4) == (N@N.T).round(4)
-
-# print(x_.round(4) == (R @ R.T @ x_).round(4))  # + (N@N.T@x).round(4)

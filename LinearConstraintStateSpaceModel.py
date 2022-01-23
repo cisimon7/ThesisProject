@@ -5,7 +5,7 @@ from scipy.integrate import odeint
 from plotly.subplots import make_subplots
 from typing import Optional, List, Tuple, Dict, Any
 from LinearStateSpaceModel import LinearStateSpaceModel
-from OrthogonalDecomposition import svd_4subspaces, matrix_rank
+from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
 class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
@@ -45,7 +45,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         assert (self.rank_G < self.state_size), \
             f"Invalid Null space of Constraint matrix: {self.state_size - self.rank_G}"
 
-        row_G, col_G, left_null_G, null_G = svd_4subspaces(self.G)  # cross-check this function more
+        row_G, col_G, left_null_G, null_G = subspaces_from_svd(self.G)  # cross-check this function more
         self.N = null_G
         self.R = row_G
 

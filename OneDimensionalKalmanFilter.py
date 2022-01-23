@@ -52,7 +52,7 @@ class OneDimensionalKalmanFilter:
             layout=go.Layout(title="Kalman Gain", yaxis=dict(title="Gain"), xaxis=dict(title="Measurement number"))
         ).show()
 
-    def plot_estimate_uncertainty(self):
+    def plot_uncertainties(self):
         measurement_uncertainty = np.sqrt(np.asarray(self.prev_variance[1:]).flatten())
         estimate_uncertainty = np.sqrt(np.asarray(self.measurement_variance[1:]).flatten())
         count = np.asarray([i for i in np.arange(start=0, stop=len(self.K_gain), step=1)])
@@ -61,7 +61,7 @@ class OneDimensionalKalmanFilter:
                 go.Scatter(x=count, y=measurement_uncertainty, name="Measurement Uncertainty"),
                 go.Scatter(x=count, y=estimate_uncertainty, name="Estimate Uncertainty")
             ],
-            layout=go.Layout(title="Kalman Gain",
+            layout=go.Layout(title="Uncertainties",
                              yaxis=dict(title="uncertainty"),
                              xaxis=dict(title="Measurement number"))
         ).show()

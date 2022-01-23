@@ -46,4 +46,4 @@ if __name__ == "__main__":
     ).show()
 
     kalman_filter.plot_kalman_gain()
-    kalman_filter.plot_estimate_uncertainty()
+    kalman_filter.plot_uncertainties()
