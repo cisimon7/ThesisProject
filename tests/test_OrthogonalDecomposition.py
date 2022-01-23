@@ -86,10 +86,10 @@ class TestOrthogonalDecomposition(TestCase):
         x_ = 10 * np.random.randn(4)
         R, _, _, N = subspaces_from_svd(G)
 
-        z = N @ x_
+        z_ = N @ x_
         zeta = R @ x_
 
         assert_almost_equal(
             x_,
-            (N.T @ z) + (R.T @ zeta)
+            (N.T @ z_) + (R.T @ zeta)
         )
