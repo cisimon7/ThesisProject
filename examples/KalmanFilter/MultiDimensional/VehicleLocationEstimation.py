@@ -101,6 +101,6 @@ if __name__ == "__main__":
             go.Scatter(x=measurement.T[0], y=measurement.T[1], mode="lines+markers", name="Measurement"),
             go.Scatter(x=state_estimates[0], y=state_estimates[3], mode="lines+markers", name="Estimate"),
         ],
-        layout=go.Layout(showlegend=True, title="Estimating Vehicle Location", xaxis=dict(title="Time"),
-                         yaxis=dict(title="Positions"))
+        layout=go.Layout(showlegend=True, title="Vehicle Location Estimation in 2D", xaxis=dict(title="x - position"),
+                         yaxis=dict(title="y - positions"))
     ).show()
