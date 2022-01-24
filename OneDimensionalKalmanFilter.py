@@ -42,7 +42,7 @@ class OneDimensionalKalmanFilter:
         (state_pred, var_extrap) = self.predict()
         self.update(measurement, measurement_uncertainty, state_pred, var_extrap)
 
-        return self.prev_estimate, self.prev_variance[-1]
+        return self.prev_estimate
 
     def plot_kalman_gain(self):
         gains = np.asarray(self.K_gain).flatten()

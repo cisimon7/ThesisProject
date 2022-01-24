@@ -28,7 +28,7 @@ if __name__ == "__main__":
         kalman_filter.next_state_estimate(
             measurement=np.array([measure]),
             measurement_uncertainty=np.array([measurement_error ** 2])
-        )[0] for measure in measurements
+        ) for measure in measurements
     ])
 
     x_axis = np.arange(start=0, stop=len(measurements), step=1)
