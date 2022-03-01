@@ -82,7 +82,7 @@ def row_space_basis(mat: np.ndarray) -> np.ndarray:
 
 def subspaces_from_svd(mat: np.ndarray):
     """Returns orthognal basis for the four fundamental subspaces"""
-    rank = matrix_rank(mat)
+    rank = matrix_rank(mat)  # TODO(Get rank from the SVD decomposition)
     U, s, V = svd(mat, full_matrices=True)
 
     # rank = np.diag(s).shape[0]

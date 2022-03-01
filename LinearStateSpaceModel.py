@@ -82,7 +82,7 @@ class LinearStateSpaceModel:
         assert (_Q.shape[0] == _Q.shape[1] == _A.shape[0]), "State Weight cannot be multiplied with state vector"
         assert (_R.shape[0] == _R.shape[1] == _B.shape[1]), "Input Weight cannot be multiplied with state vector"
 
-        gain, _, _ = lqr(_A, _B, _Q, _R)
+        gain, _, _ = lqr(_A, _B, _Q, _R)  # TODO(remove dependency on LQR using u = - R.inv @ B.T @ S)
 
         return gain
 

@@ -30,6 +30,7 @@ class TestLTIConstraintStateEstimator(TestCase):
         self.estimator = LTIConstraintStateEstimator(self.system)
 
     def test_z_dot_hat_gain(self):
+        print(self.system.gain_lqr().shape)
         self.fail()
 
     def test_estimator(self):
