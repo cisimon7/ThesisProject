@@ -97,9 +97,10 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         z_states = np.asarray(result).transpose()
 
+        # TODO(Shouldn't be any extrapolation)
         adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(self.state_size, 1)
         return np.multiply(adjust, self.N.T) @ z_states + \
-                      np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
+               np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
 
     def ode_gain_solve(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
                        time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
