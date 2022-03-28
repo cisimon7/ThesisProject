@@ -36,20 +36,23 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         self.reaction_force_size = l
 
         # Transforming System equation into constraint subspace
-        # Confirm if pseudo-inverse can be used in cases where G is rectangular
+        # TODO(Confirm if pseudo-inverse can be used in cases where G is rectangular)
         T = np.eye(self.state_size) - self.F @ (np.linalg.pinv(self.G @ self.F)) @ self.G
         self.A = T @ self.A
         self.B = T @ self.B
 
-        self.rank_G = matrix_rank(self.G)
+        (m, n) = A.shape
+        self.state_size = n
+
+        self.rank_G = matrix_rank(self.G)  # TODO(Rank can be retrieved from svd on line 51)
         assert (self.rank_G < self.state_size), \
-            f"Invalid Null space of Constraint matrix: {self.state_size - self.rank_G}"
+            f"Invalid Null space size of Constraint matrix: {self.state_size - self.rank_G}"
 
         row_G, col_G, left_null_G, null_G = subspaces_from_svd(self.G)  # cross-check this function more
         self.N = null_G
         self.R = row_G
 
-        self.zeta = np.zeros(self.rank_G)  # To be implemented later
+        self.zeta = np.zeros(self.rank_G)  # TODO(To be implemented later)
         self.gain = None
         self.init_z_state = None
 
@@ -57,15 +60,18 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
         (z, zeta) = (state, self.zeta)
+        # (z, zeta) = self.N @ state, self.R @ state
         (A, B, N, R) = (self.A, self.B, self.N, self.R)
 
         self.__assert_state_size(z)
         self.__assert_zeta_size(zeta)
         self.__assert_gain_size(gain)
 
+        # Line 13 from main paper
         _gain_zeta = - np.linalg.pinv(N @ B) @ N @ A @ R.T @ zeta
 
-        result = (N @ (A @ N.T + B @ gain) @ z) + (N @ B @ _gain_zeta) + (N @ A @ R.T @ zeta)
+        # Substituting line 14 into line 9 from the main paper
+        result = (N @ (A @ N.T - B @ gain) @ z) + (N @ B @ _gain_zeta) + (N @ A @ R.T @ zeta)
         return result
 
     def gain_lqr(self, A=None, B=None, Q=None, R=None, set_gain=True):
@@ -83,24 +89,26 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         return gain
 
-    def state_time_solve(self, prev_time, current_time, init_state, params: Dict[str, Any] = dict(gain=None)):
-        (A, B, N, R) = (self.A, self.B, self.N, self.R)
+    # def state_time_solve(self, prev_time, current_time, init_state, params: Dict[str, Any] = dict(gain=None)):
+    #     (A, B, N, R) = (self.A, self.B, self.N, self.R)
+    #
+    #     _init_state = self.N @ init_state
+    #
+    #     gain = params['gain']
+    #
+    #     # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
+    #     _gain = self.gain_lqr() if (gain is None) else gain
+    #
+    #     result = odeint(self.z_dot_gain, _init_state, np.array([prev_time, current_time]), args=(_gain,))
+    #
+    #     z_states = np.asarray(result).transpose()
+    #
+    #     return (self.N.T @ z_states) + np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
 
-        _init_state = self.N @ init_state
-
-        gain = params['gain']
-
-        # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
-        _gain = self.gain_lqr() if (gain is None) else gain
-
-        result = odeint(self.z_dot_gain, _init_state, np.array([prev_time, current_time]), args=(_gain,))
-
-        z_states = np.asarray(result).transpose()
-
-        # TODO(Shouldn't be any extrapolation)
-        adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(self.state_size, 1)
-        return np.multiply(adjust, self.N.T) @ z_states + \
-               np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
+    # TODO(Shouldn't be any extrapolation)
+    # adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(self.state_size, 1)
+    # return np.multiply(adjust, self.N.T) @ z_states + \
+    #        np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
 
     def ode_gain_solve(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
                        time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
@@ -109,29 +117,27 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         self.time = time_space
 
         _init_state = self.init_state if (init_state is None) else init_state
-        _init_state = self.N @ _init_state
-        self.init_z_state = _init_state
+        self.init_z_state = self.N @ _init_state
+        self.zeta = self.R @ _init_state
 
         gain = params['gain']
 
-        # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
+        # uses identity matrix for Q and R to get an initial lqr gain if gain is not specified
         _gain = self.gain_lqr() if (gain is None) else gain
         self.gain = _gain
 
-        result = odeint(self.z_dot_gain, _init_state, self.time, args=(_gain,), printmessg=verbose)
+        result = odeint(self.z_dot_gain, self.init_z_state, self.time, args=(_gain,), printmessg=verbose)
 
         z_states = np.asarray(result).transpose()
         d_z_states = np.asarray(
             [self.z_dot_gain(state, time=t, gain=_gain) for (t, state) in zip(self.time, result)]
-        ).transpose()
+        ).transpose()  # TODO(Check for better way to finding this from odeint above)
 
-        adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(self.state_size, 1)
-        init_d_state = self.x_dot_gain(self.init_state, 0, _gain)
-        d_adjust = np.divide(init_d_state, self.N.T @ d_z_states[:, 0]).reshape(self.state_size, 1)
+        cons_zeta = self.R.T @ (self.zeta - self.zeta)
 
-        self.states = np.multiply(adjust, self.N.T) @ z_states + \
-                      np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
-        self.d_states = np.multiply(d_adjust, self.N.T) @ d_z_states
+        # Calibrating to remove constant zeta gain
+        self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
+        self.d_states = self.N.T @ d_z_states
 
         self.controller = - _gain @ self.N @ self.states
         self.output()

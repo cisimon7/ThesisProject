@@ -55,22 +55,22 @@ class LTIConstraintStateEstimator:
         self.output = np.array([])
         self.t_prev = -self.system.time[0]
 
-    def state_dot_hat(self, init_state: np.ndarray, time, L_gain: np.ndarray, K_gain: np.ndarray) -> np.ndarray:
+    def state_dot_hat(self, x_state: np.ndarray, time, L_gain: np.ndarray, K_gain: np.ndarray) -> np.ndarray:
         """Returns an estimate of the state vector derivative vector at a given state and controller gain"""
 
         (A, B, C, D) = (self.A, self.B, self.C, self.D)
         (Ac, Bc) = (self.system.A, self.system.B)
         (N, R) = (self.system.N, self.system.R)
 
-        z_hat = N @ init_state  # z state
-        zeta_hat = R @ init_state  # zeta state
+        z_hat = N @ x_state  # z state
+        zeta_hat = R @ x_state  # zeta state
         state_hat = np.r_[z_hat, zeta_hat]
 
         # To be received from measurement, contains errors
-        y_actual = (C @ init_state) # TODO(Should be state_hat instead of init_state)
+        y_actual = (C @ state_hat)  # TODO(Should be state_hat instead of x_state)
 
         U_z = - K_gain @ N @ state_hat
-        U_zeta = - np.linalg.pinv(N@Bc) @ N @ Ac @ R.T @ zeta_hat
+        U_zeta = - np.linalg.pinv(N @ Bc) @ N @ Ac @ R.T @ zeta_hat
 
         es_B = np.block([[B, L_gain]])
         es_input = np.vstack((
@@ -110,6 +110,12 @@ class LTIConstraintStateEstimator:
         # Plot States
         go.Figure(
             data=[go.Scatter(x=self.system.time, y=state, mode='lines') for state in state_hat.T],
+            layout=go.Layout()
+        ).show()
+
+        # Plot G @ x
+        go.Figure(
+            data=[go.Scatter(x=self.system.time, y=state, mode='lines') for state in (self.system.G @ state_hat.T)],
             layout=go.Layout()
         ).show()
 

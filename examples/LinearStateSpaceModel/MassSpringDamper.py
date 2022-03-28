@@ -12,11 +12,16 @@ if __name__ == '__main__':
     B = [[0],
          [1 / m]]
 
-    mass_spring = LinearStateSpaceModel(A=np.asarray(A), B=np.asarray(B), init_state=np.asarray([1, 1]))
+    mass_spring = LinearStateSpaceModel(
+        A=np.asarray(A),
+        B=np.asarray(B),
+        init_state=np.asarray([1, 1])
+    )
     mass_spring.ode_gain_solve(
         params=dict(gain=np.asarray([[2, 1]])),
         time_space=np.linspace(0, 20, int(2E3))
     )
+
     mass_spring.plot_states()
     mass_spring.plot_controller()
     mass_spring.plot_output()

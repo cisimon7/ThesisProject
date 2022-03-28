@@ -1,7 +1,10 @@
 import numpy as np
 from unittest import TestCase
 
+from numpy.linalg import matrix_rank
+
 from LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
+from OrthogonalDecomposition import subspaces_from_svd
 
 
 class TestLinearConstraintStateSpaceModel(TestCase):
@@ -67,40 +70,38 @@ class TestLinearConstraintStateSpaceModel(TestCase):
             F=np.eye(3, 6),
             init_state=np.array([3, 5, 10])
         )
+        print(system.N)
         system.ode_gain_solve(time_space=np.linspace(0, 20, int(2E3)))
         system.plot_states()
-
-    def test_system4(self):
-        system = LinearConstraintStateSpaceModel(
-            A=self.A2,
-            B=self.B2,
-            G=np.array([
-                [1, 2, 3],
-                [1, 1, 2],
-                [1, 2, 3]
-            ]),
-            F=np.eye(3, 6),
-            init_state=2 * np.random.randn(3)
-        )
-        system.ode_gain_solve(time_space=np.linspace(0, 60, int(2E3)))
-        system.plot_states()
-        system.plot_controller()
-        system.plot_output()
 
     def test_random_system(self):
-        A = np.random.randn(3, 3)
-        B = np.random.randn(3, 4)
-        F = np.random.randn(3, 6)
-        state = np.random.randn(3)
-        system = LinearConstraintStateSpaceModel(A=A, B=B, G=np.array([
-            [1, 2, 3],
-            [1, 1, 2],
-            [1, 2, 3]
-        ]), F=F, init_state=state)
-        system.ode_gain_solve(time_space=np.linspace(0, 20, int(2E3)))
+        n = 4
+        u = 3
+        A = np.random.randn(n, n)
+        B = np.random.randn(n, u)
+        F = np.random.randn(n, 6)
+        state = np.random.randn(n)
+
+        # Generate random row space basis
+        row_space = 10 * np.random.random_sample() * np.random.randn(np.random.choice(np.arange(1, n)), n)
+        assert matrix_rank(row_space) == len(row_space)  # Make sure rows are independent
+
+        part = np.asarray([
+            np.sum(np.asarray([np.random.random_sample() * vector for vector in row_space]), axis=0)
+            for _ in range(n - len(row_space))
+        ])  # Generate random linear combination of row space of length n - len(row_space)
+
+        G = np.block([[row_space], [part]])  # Form Constraint matrix from row space
+        R, _, _, N = subspaces_from_svd(G)
+        print(f"G:\n{G}\n")
+        print(f"{N}\n")
+        print(f"{R}\n")
+
+        system = LinearConstraintStateSpaceModel(A=A, B=B, G=G, F=F, init_state=state)
+        system.ode_gain_solve(time_space=np.linspace(0, 10, int(2E3)))
         system.plot_states()
 
-        print(A)
-        print(B)
-        print(F)
-        print(state)
+        print(f"A:\n{A}\n")
+        print(f"B:\n{B}\n")
+        print(f"F:\n{F}\n")
+        print(f"initial state:\n{state}\n")
