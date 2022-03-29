@@ -66,6 +66,7 @@ class LinearStateSpaceModel:
 
     def output(self) -> np.ndarray:
         assert (self.controller is not None), "Controller not defined yet"
+
         result = self.C @ self.states + self.D @ self.controller
         self.output_states = result
         return result
@@ -131,11 +132,10 @@ class LinearStateSpaceModel:
         fig.update_layout(showlegend=False, height=800).show()
 
     def plot_controller(self, title="Controller Plot"):
-        print(self.controller.shape)
         go.Figure(
             data=[go.Scatter(x=self.time, y=cont, name=f'control input [{i}]') for (i, cont) in
                   enumerate(self.controller)],
-            layout=go.Layout(showlegend=True, title=title, legend=dict(orientation='h'),
+            layout=go.Layout(showlegend=True, title=dict(text=title, x=0.5), legend=dict(orientation='h'),
                              xaxis=dict(title='time'), yaxis=dict(title='controller size'))
         ).show()
 
@@ -143,7 +143,7 @@ class LinearStateSpaceModel:
         go.Figure(
             data=[go.Scatter(x=self.time, y=output, name=f'output state [{i}]') for (i, output) in
                   enumerate(self.output_states)],
-            layout=go.Layout(showlegend=True, title=title, legend=dict(orientation='h'),
+            layout=go.Layout(showlegend=True, title=dict(text=title, x=0.5), legend=dict(orientation='h'),
                              xaxis=dict(title='time'), yaxis=dict(title='output states'))
         ).show()
 

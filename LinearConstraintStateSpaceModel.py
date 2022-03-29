@@ -52,14 +52,16 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         self.N = null_G
         self.R = row_G
 
-        self.zeta = np.zeros(self.rank_G)  # TODO(To be implemented later)
-        self.gain = None
+        self.zeta = self.R @ init_state  # TODO(To be implemented later)
         self.init_z_state = None
+
+        self.gain = None  # gain for z state
+        self.zeta_gain = np.linalg.pinv(self.N @ self.B) @ self.N @ self.A @ self.R.T  # gain for zeta
 
     def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
-        (z, zeta) = (state, self.zeta)
+        (z, zeta) = (state, self.R @ self.init_state)
         # (z, zeta) = self.N @ state, self.R @ state
         (A, B, N, R) = (self.A, self.B, self.N, self.R)
 
@@ -72,6 +74,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         # Substituting line 14 into line 9 from the main paper
         result = (N @ (A @ N.T - B @ gain) @ z) + (N @ B @ _gain_zeta) + (N @ A @ R.T @ zeta)
+
         return result
 
     def gain_lqr(self, A=None, B=None, Q=None, R=None, set_gain=True):
@@ -89,31 +92,9 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         return gain
 
-    # def state_time_solve(self, prev_time, current_time, init_state, params: Dict[str, Any] = dict(gain=None)):
-    #     (A, B, N, R) = (self.A, self.B, self.N, self.R)
-    #
-    #     _init_state = self.N @ init_state
-    #
-    #     gain = params['gain']
-    #
-    #     # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
-    #     _gain = self.gain_lqr() if (gain is None) else gain
-    #
-    #     result = odeint(self.z_dot_gain, _init_state, np.array([prev_time, current_time]), args=(_gain,))
-    #
-    #     z_states = np.asarray(result).transpose()
-    #
-    #     return (self.N.T @ z_states) + np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
-
-    # TODO(Shouldn't be any extrapolation)
-    # adjust = np.divide(self.init_state, self.N.T @ z_states[:, 0]).reshape(self.state_size, 1)
-    # return np.multiply(adjust, self.N.T) @ z_states + \
-    #        np.asarray([self.R.T @ self.zeta for _ in range(z_states.shape[1])]).T
-
     def ode_gain_solve(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
                        time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
 
-        (A, B, N, R) = (self.A, self.B, self.N, self.R)
         self.time = time_space
 
         _init_state = self.init_state if (init_state is None) else init_state

@@ -2,36 +2,28 @@ from unittest import TestCase
 import numpy as np
 
 from LTIConstraintStateEstimator import LTIConstraintStateEstimator
-from LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
+from tests.test_systems import *
 
 
 class TestLTIConstraintStateEstimator(TestCase):
 
-    def setUp(self) -> None:
-        A1 = np.array([[-1.01416031, -0.85202817, -0.23718763],
-                       [-0.24703406, -1.20508211, 0.47151586],
-                       [0.37052781, 1.13780232, -0.05080365]])
+    def test_state_dot(self):
+        system = LTIConstraintStateEstimator(constraint_system2)
+        dot = system.state_dot_hat(x_state=system.system.init_state, time=0,
+                                   L_gain=np.eye(system.system.state_size), K_gain=system.system.gain_lqr())
+        print(dot)
 
-        B1 = np.array([[1.62100904, 1.11382971, 1.68311231, 0.90885391],
-                       [-0.51764834, -1.15764292, -0.53954765, -0.13238155],
-                       [-0.60691388, -0.50319479, 0.79373825, 1.07906922]])
+    def test_system2(self) -> None:
+        system = LTIConstraintStateEstimator(constraint_system2)
+        system.estimate(time_space=np.linspace(0, 20, int(2E3)))
 
-        self.system = LinearConstraintStateSpaceModel(
-            A=A1,
-            B=B1,
-            G=np.array([
-                [1, 2, 3],
-                [1, 1, 2],
-                [1, 2, 3]
-            ]),
-            F=np.eye(3, 6),
-            init_state=np.array([3, 5, 10])
-        )
-        self.estimator = LTIConstraintStateEstimator(self.system)
+        system.plot_states()
+        system.plot_controller()
+        system.plot_output()
 
-    def test_z_dot_hat_gain(self):
-        print(self.system.gain_lqr().shape)
-        self.fail()
-
-    def test_estimator(self):
-        self.estimator.estimate()
+    def test_system4(self):
+        system = LTIConstraintStateEstimator(constraint_system4)
+        system.estimate(time_space=np.linspace(0, 15, int(2E3)))
+        system.plot_states()
+        system.plot_controller()
+        system.plot_output()
