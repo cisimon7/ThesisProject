@@ -2,6 +2,45 @@ import numpy as np
 from LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
 from OrthogonalDecomposition import matrix_rank, subspaces_from_svd
 
+# SOME INTERESTING SYSTEMS GENERATED FROM RANDOM SAMPLE
+
+constraint_system6 = LinearConstraintStateSpaceModel(
+    A=np.array([
+        [1.3062, 3.5495, 3.4974, 1.277, 1.3043, 6.8957, 4.2683],
+        [4.1653, 3.3022, 3.7618, 7.695, 7.699, 1.6591, 2.3765],
+        [4.0102, 7.312, 2.3005, 5.8425, 0.6391, 6.686, 1.2101],
+        [2.6521, 4.5329, 2.6833, 1.4578, 0.6255, 0.5169, 6.3852],
+        [7.6552, 0.1763, 8.2501, 0.2699, 0.3245, 3.6695, 4.3044],
+        [5.1276, 6.7918, 3.9073, 8.7601, 3.0387, 4.6854, 4.425],
+        [4.6032, 5.5747, 1.9444, 2.3762, 6.3462, 3.4319, 6.1985]
+    ]),
+    B=np.array([
+        [0.2989, 0.373, 0.022, 0.4413],
+        [0.9781, 0.1205, 0.7935, 0.2742],
+        [0.134, 0.2106, 0.5448, 0.8398],
+        [0.2379, 0.2601, 0.863, 0.8344],
+        [0.1246, 0.6611, 0.163, 0.5208],
+        [0.9529, 0.2726, 0.8249, 0.9981],
+        [0.6672, 0.7439, 0.594, 0.4416]
+    ]),
+    G=np.array([
+        [3.627, 6.868, 8.678, 4.913, 6.627, 8.365, 6.523],
+        [0.987, 3.33, 2.65, 4.234, 7.262, 2.215, 8.091],
+        [5.759, 0.81, 1.132, 4.435, 8.065, 5.591, 0.963],
+        [66.344, 66.65, 72.514, 89.482, 147.686, 98.682, 104.084]
+    ]),
+    F=np.array([
+        [1.2436, 3.0835, 1.7777, 5.6664, 3.1442, 3.044],
+        [3.8605, 3.5469, 2.742, 5.9887, 4.2676, 5.3153],
+        [3.4615, 4.8691, 4.9149, 4.249, 0.9487, 4.4745],
+        [2.7704, 0.2275, 3.837, 4.8859, 4.7911, 4.5483],
+        [1.7921, 4.4615, 2.5691, 1.5664, 2.1011, 2.2057],
+        [3.0171, 4.7265, 3.7799, 4.4727, 4.716, 3.9503],
+        [1.7583, 5.3771, 4.0654, 3.6596, 4.4334, 0.5287]
+    ]),
+    init_state=np.array([2.66094476, 4.05521636, 3.33001269, 2.76215208, 2.69931146, 3.6949612, 2.45076177])
+)
+
 constraint_system5 = LinearConstraintStateSpaceModel(
     A=np.array([
         [0.29388389, 0.60619791, 0.61711047, 0.98134008, 0.8411186],
@@ -102,10 +141,13 @@ def random_system(n_size=4, u_size=3, k_size=4):
     n = n_size  # size of state vector
     u = u_size  # size of controller vector
     k = k_size  # number of constraints
-    A = np.random.rand(n, n)
-    B = np.random.rand(n, u)
-    F = np.random.rand(n, 6)
-    state = np.random.rand(n)
+    A = np.round(np.random.randint(1, 10) * np.random.rand(n, n), 4)
+    B = np.round(np.random.randint(1, 10) * np.random.rand(n, u), 4)
+    F = np.round(np.random.randint(1, 10) * np.random.rand(n, 6), 4)
+    state = np.random.randint(1, 10) * np.random.rand(n)
+
+    # TODO(Assert matrix A and B is controllable) Equation 10
+    # TODO(Assert matrix A and C is observable)
 
     # Generate random row space basis
     row_space = 10 * np.round(np.random.random_sample() * np.random.rand(np.random.choice(np.arange(1, k)), n), 4)

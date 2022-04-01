@@ -17,6 +17,8 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         taking into account the constraint matrix
         """
 
+        # TODO(Check for controllability of given matrix A and B)
+
         super().__init__(A, B, C, D, init_state)
 
         assert (G is not None), "Constraint Matrix not specified. Consider using LinearStateSpaceModel"
