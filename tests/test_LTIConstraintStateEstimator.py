@@ -22,7 +22,14 @@ class TestLTIConstraintStateEstimator(TestCase):
 
     def test_system4(self):
         system = LTIConstraintStateEstimator(constraint_system4)
-        system.estimate(time_space=np.linspace(0, 15, int(2E3)))
+        system.estimate(time_space=np.linspace(0, 20, int(2E3)))
+        # system.plot_states()
+        # system.plot_controller()
+        system.plot_output()
+
+    def test_system5(self):
+        system = LTIConstraintStateEstimator(constraint_system5)
+        system.estimate(time_space=np.linspace(0, 20, int(2E3)))
         # system.plot_states()
         # system.plot_controller()
         system.plot_output()
