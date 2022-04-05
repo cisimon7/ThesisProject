@@ -40,8 +40,8 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         # Transforming System equation into constraint subspace
         # TODO(Confirm if pseudo-inverse can be used in cases where G is rectangular)
         T = np.eye(self.state_size) - self.F @ (np.linalg.pinv(self.G @ self.F)) @ self.G
-        self.A = T @ self.A
-        self.B = T @ self.B
+        self.A = T @ self.A  # Ac in paper
+        self.B = T @ self.B  # Bc in paper
 
         (m, n) = A.shape
         self.state_size = n

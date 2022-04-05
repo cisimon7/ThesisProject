@@ -44,6 +44,14 @@ def is_orthonormal(mat: np.ndarray) -> bool:
     return False
 
 
+def is_positive_definite(mat: np.ndarray) -> bool:
+    return np.all(np.linalg.eigvals(mat) > 0)
+
+
+def is_symmetric(mat: np.ndarray, tol=1e-5) -> bool:
+    return np.all(np.abs(mat - mat.T) < tol)
+
+
 def rnd_orth(size: int) -> np.ndarray:
     """
     Generate Random Orthonormal Square matrices
