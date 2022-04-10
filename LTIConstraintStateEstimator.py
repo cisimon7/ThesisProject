@@ -18,12 +18,13 @@ class LTIConstraintStateEstimator:
 
     def __init__(self, system: LinearConstraintStateSpaceModel):
         self.system = system
-        (N, R) = (system.N, system.R)
-        (A, B) = (system.A, system.B)
-        (C, D) = (system.C, system.D)
-        (self.r, self.l) = (system.rank_G, system.state_size - system.rank_G)
-
+        (N, R) = (system.N, system.R)  # NullSpace and RowSpace
+        (A, B) = (system.A, system.B)  # (Ac, Bc)
+        (C, D) = (system.C, system.D)  #
+        (self.r, self.l) = (system.rank_G, system.state_size - system.rank_G)  # Dimension of R, Dimension of N
         (r, l) = self.r, self.l
+
+        # Components of Equation 15
 
         self.A = np.block([
             [N @ A @ N.T, N @ A @ R.T],
@@ -36,17 +37,9 @@ class LTIConstraintStateEstimator:
         ])
 
         self.C = C @ np.block([[N.T, R.T]])
+        # TODO(Check for observability of C)
 
-        self.D = np.block([
-            [system.D]
-        ])
-
-        # TODO(Check for observability)
-
-        # self.system.A = self.A
-        # self.system.B = self.B
-        # self.system.C = self.C
-        # self.system.D = self.D
+        self.D = D
 
         self.zeta = R @ self.system.init_state
 
@@ -70,18 +63,17 @@ class LTIConstraintStateEstimator:
         y_actual = y_actual + (0 * measurement_noise)  # Adding noise to simulate sensor noise
 
         U_z = - K_gain @ z_hat
-        U_zeta = - self.system.zeta_gain @ self.system.zeta
+        U_zeta = - self.system.gain_zeta @ self.system.zeta
 
         es_B = np.block([[B, L_gain]])
-        es_input = np.vstack((
-            (U_z + U_zeta).reshape(-1, 1), y_actual.reshape(-1, 1)
-        ))
+        es_input = np.r_[(U_z + U_zeta), y_actual]
 
         p_sig = 0.1
         p_mu = 0
         process_noise = p_sig * np.random.randn(x_state.shape[0]) + p_mu
 
-        d_state_estimate = ((A - L_gain @ C) @ state_hat) + (es_B @ es_input).ravel() + (0 * process_noise)
+        # Equation 16 re-arranged
+        d_state_estimate = ((A - L_gain @ C) @ state_hat) + (es_B @ es_input) + (0 * process_noise)
 
         d_z_ = d_state_estimate[:self.l]
         d_zeta_ = d_state_estimate[self.l:]
@@ -91,30 +83,23 @@ class LTIConstraintStateEstimator:
         return d_x
 
     def estimate(self, params: ZDotHatParams = ZDotHatParams(gain=None), time_space=None, verbose=False):
-        L_gain, _, _ = lqe(
-            self.A,
-            np.eye(self.A.shape[0]),
-            self.C,
-            np.eye(self.A.shape[0]),
-            np.eye(self.C.shape[1])
+        # L_gain, _, _ = lqe(
+        #     self.A,
+        #     np.eye(self.A.shape[0]),
+        #     self.C,
+        #     np.eye(self.A.shape[0]),
+        #     np.eye(self.C.shape[1])
+        # ) if params.gain is None else params.gain  # Estimator Gain
+
+        L_gain = self.system.gain_lqr(
+            A=self.A.T,
+            B=self.C.T,
+            Q=np.eye(self.A.shape[0]),
+            R=np.eye(self.C.shape[1])
         ) if params.gain is None else params.gain  # Estimator Gain
 
-        # L_gain, _, _ = self.system.gain_lqr(
-        #     A=self.system.A.T,
-        #     B=self.system.C.T,
-        #     Q=np.eye(self.system.state_size - self.system.rank_G).T,
-        #     R=np.eye(self.system.control_size).T
-        # ) if params.gain is None else params.gain  # Estimator Gain
-
-        # L_gain = self.system.gain_lqr(
-        #     A=self.A.T,
-        #     B=self.C.T,
-        #     Q=np.eye(self.A.shape[0]),
-        #     R=np.eye(self.C.shape[1])
-        # ) if params.gain is None else params.gain  # Estimator Gain
-
         k_gain = self.system.gain_lqr()  # Controller Gain
-        x0 = self.system.init_state  # Initial State in x forms
+        x0 = self.system.init_state  # Initial State in x form
 
         if time_space is not None:
             self.system.time = time_space
@@ -127,8 +112,14 @@ class LTIConstraintStateEstimator:
             printmessg=verbose
         ))  # Solve Differential Equation
 
-        self.system.states = np.asarray([state - (self.system.R.T @ self.system.zeta) for state in state_hat]).T
-        self.system.d_states = np.asarray([self.state_dot_hat(x, 0, L_gain, k_gain) for x in state_hat]).T
+        self.system.states = np.asarray([
+            state - (self.system.R.T @ self.system.zeta)
+            for state in state_hat
+        ]).T
+        self.system.d_states = np.asarray([
+            self.state_dot_hat(x, 0, L_gain, k_gain)
+            for x in state_hat
+        ]).T
 
         self.system.controller = - k_gain @ self.system.N @ state_hat.T
 

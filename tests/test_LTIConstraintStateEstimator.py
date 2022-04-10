@@ -2,7 +2,7 @@ from unittest import TestCase
 import numpy as np
 
 from LTIConstraintStateEstimator import LTIConstraintStateEstimator
-from tests.test_systems import *
+from tests.systems import *
 
 
 class TestLTIConstraintStateEstimator(TestCase):
@@ -29,6 +29,20 @@ class TestLTIConstraintStateEstimator(TestCase):
 
     def test_system5(self):
         system = LTIConstraintStateEstimator(constraint_system5)
+        system.estimate(time_space=np.linspace(0, 20, int(2E3)))
+        # system.plot_states()
+        # system.plot_controller()
+        system.plot_output()
+
+    def test_system7(self):
+        system = LTIConstraintStateEstimator(constraint_system7)
+        system.estimate(time_space=np.linspace(0, 5, int(2E3)))
+        system.plot_states()
+        system.plot_controller()
+        system.plot_output()
+
+    def test_random_system(self):
+        system = LTIConstraintStateEstimator(random_system(n_size=6, u_size=5, k_size=4))
         system.estimate(time_space=np.linspace(0, 20, int(2E3)))
         # system.plot_states()
         # system.plot_controller()

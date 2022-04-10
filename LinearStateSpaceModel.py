@@ -24,7 +24,7 @@ class LinearStateSpaceModel:
         C = np.eye(self.state_size) if C is None else C
 
         (k, l) = C.shape
-        assert (l == n), "System Matrix C cannot be multiplied by state vector"
+        assert (l == self.state_size), "System Matrix C cannot be multiplied by state vector"
         self.output_size = k
         self.C = C
 

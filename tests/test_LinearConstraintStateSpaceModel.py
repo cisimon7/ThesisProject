@@ -1,5 +1,5 @@
 from unittest import TestCase
-from tests.test_systems import *
+from tests.systems import *
 
 
 class TestLinearConstraintStateSpaceModel(TestCase):
@@ -38,6 +38,13 @@ class TestLinearConstraintStateSpaceModel(TestCase):
 
     def test_system6(self):
         system = constraint_system6
+        system.ode_gain_solve(time_space=np.linspace(0, 5, int(2E3)))
+        # system.plot_states()
+        # system.plot_controller()
+        system.plot_output()
+
+    def test_system7(self):
+        system = constraint_system7
         system.ode_gain_solve(time_space=np.linspace(0, 5, int(2E3)))
         # system.plot_states()
         # system.plot_controller()

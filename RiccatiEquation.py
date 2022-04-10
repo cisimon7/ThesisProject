@@ -21,6 +21,6 @@ class RiccatiEquation:
         Q, R = (np.eye(A_nn.shape[0]), np.eye(B_n.shape[1]))
 
         K, S_nn, _ = lqr(A_nn, B_n, Q, R)
-        phi = - np.linalg.inv(2 * A_nn.T - S_nn @ B_n @ np.linalg.inv(R) @ B_n.T) @ S_nn @ A_nn  # @ zeta
+        phi = - np.linalg.inv(2 * A_nn.T - S_nn @ B_n @ np.linalg.inv(R) @ B_n.T) @ S_nn @ A_nr @ zeta
 
         return S_nn, phi
