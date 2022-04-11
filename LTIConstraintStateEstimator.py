@@ -2,10 +2,11 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-from control import lqe
+from control import lqe, lqr
 from scipy.integrate import odeint
 
 from LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
+from RiccatiEquation import RiccatiEquation
 
 
 @dataclass
@@ -26,6 +27,8 @@ class LTIConstraintStateEstimator:
 
         # Components of Equation 15
 
+        print(f"{A.shape=}")
+
         self.A = np.block([
             [N @ A @ N.T, N @ A @ R.T],
             [np.zeros((r, l)), np.zeros((r, r))]
@@ -43,11 +46,16 @@ class LTIConstraintStateEstimator:
 
         self.zeta = R @ self.system.init_state
 
-    def state_dot_hat(self, x_state: np.ndarray, time, L_gain: np.ndarray, K_gain: np.ndarray) -> np.ndarray:
+    def state_dot_hat(self, x_state: np.ndarray, time, L_gain: np.ndarray, K_gain: np.ndarray,
+                      control_constant: np.ndarray) -> np.ndarray:
         """Returns an estimate of the state vector derivative vector at a given state and controller gain"""
 
         (A, B, C, D) = (self.A, self.B, self.C, self.D)
         (N, R) = (self.system.N, self.system.R)
+
+        p_sig = 0.1
+        p_mu = 0
+        process_noise = p_sig * np.random.randn(x_state.shape[0]) + p_mu
 
         z_hat = N @ x_state  # z state
         zeta_hat = R @ x_state  # zeta state
@@ -63,14 +71,13 @@ class LTIConstraintStateEstimator:
         y_actual = y_actual + (0 * measurement_noise)  # Adding noise to simulate sensor noise
 
         U_z = - K_gain @ z_hat
+        if control_constant is not None:
+            U_z += control_constant
+
         U_zeta = - self.system.gain_zeta @ self.system.zeta
 
         es_B = np.block([[B, L_gain]])
         es_input = np.r_[(U_z + U_zeta), y_actual]
-
-        p_sig = 0.1
-        p_mu = 0
-        process_noise = p_sig * np.random.randn(x_state.shape[0]) + p_mu
 
         # Equation 16 re-arranged
         d_state_estimate = ((A - L_gain @ C) @ state_hat) + (es_B @ es_input) + (0 * process_noise)
@@ -82,7 +89,7 @@ class LTIConstraintStateEstimator:
 
         return d_x
 
-    def estimate(self, params: ZDotHatParams = ZDotHatParams(gain=None), time_space=None, verbose=False):
+    def estimate(self, k_gain=None, L_gain=None, control_constant=None, time_space=None, verbose=False):
         # L_gain, _, _ = lqe(
         #     self.A,
         #     np.eye(self.A.shape[0]),
@@ -94,11 +101,11 @@ class LTIConstraintStateEstimator:
         L_gain = self.system.gain_lqr(
             A=self.A.T,
             B=self.C.T,
-            Q=np.eye(self.A.shape[0]),
-            R=np.eye(self.C.shape[1])
-        ) if params.gain is None else params.gain  # Estimator Gain
+            Q=np.eye(self.A.T.shape[0]),
+            R=np.eye(self.C.T.shape[1])
+        ) if L_gain is None else L_gain  # Estimator Gain
 
-        k_gain = self.system.gain_lqr()  # Controller Gain
+        k_gain = self.system.gain_lqr() if k_gain is None else k_gain  # Controller Gain
         x0 = self.system.init_state  # Initial State in x form
 
         if time_space is not None:
@@ -108,7 +115,7 @@ class LTIConstraintStateEstimator:
             func=self.state_dot_hat,
             y0=x0,
             t=self.system.time,
-            args=(L_gain, k_gain,),
+            args=(L_gain, k_gain, control_constant,),
             printmessg=verbose
         ))  # Solve Differential Equation
 
@@ -117,7 +124,7 @@ class LTIConstraintStateEstimator:
             for state in state_hat
         ]).T
         self.system.d_states = np.asarray([
-            self.state_dot_hat(x, 0, L_gain, k_gain)
+            self.state_dot_hat(x, 0, L_gain, k_gain, control_constant)
             for x in state_hat
         ]).T
 
