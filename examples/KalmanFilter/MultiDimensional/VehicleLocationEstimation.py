@@ -1,9 +1,7 @@
-import math
-
 import numpy as np
 import plotly.graph_objects as go
 
-from MultiDimensionalKalmanFilter import MultiDimensionalKalmanFilter
+from KalmanFilter.MultiDimensionalKalmanFilter import MultiDimensionalKalmanFilter
 
 if __name__ == "__main__":
     """

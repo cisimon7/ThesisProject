@@ -1,7 +1,6 @@
 from unittest import TestCase
-import numpy as np
 
-from LTIConstraintStateEstimator import LTIConstraintStateEstimator
+from Constrained.LTIConstraintStateEstimator import LTIConstraintStateEstimator
 from tests.systems import *
 
 

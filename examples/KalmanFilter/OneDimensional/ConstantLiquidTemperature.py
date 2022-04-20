@@ -1,6 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
-from OneDimensionalKalmanFilter import OneDimensionalKalmanFilter
+from KalmanFilter.OneDimensionalKalmanFilter import OneDimensionalKalmanFilter
 
 if __name__ == "__main__":
     """

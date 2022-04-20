@@ -1,5 +1,5 @@
 import numpy as np
-from LinearStateSpaceModel import LinearStateSpaceModel
+from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
 
 if __name__ == '__main__':
     m = 1  # Spring mass

@@ -1,10 +1,9 @@
 import numpy as np
 import plotly.graph_objects as go
-from control import lqr
 from scipy.integrate import odeint
 from plotly.subplots import make_subplots
-from typing import Optional, List, Tuple, Dict, Any
-from LinearStateSpaceModel import LinearStateSpaceModel
+from typing import Optional
+from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
 from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
@@ -49,18 +48,19 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         self.R, _, _, self.N = subspaces_from_svd(self.G)
 
-        # TODO(How is the value of zeta constant when it is dependent on x?)
         self.zeta = self.R @ init_state
 
         self.gain_z = None  # gain for z state
 
         self.gain_zeta = np.linalg.pinv(self.N @ self.B) @ self.N @ self.A @ self.R.T  # From Equation 13
 
-    def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray) -> np.ndarray:
+    def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray, control_const: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
         (z, zeta, gain_zeta) = (state, self.zeta, self.gain_zeta)
         (A, B, N, R) = (self.A, self.B, self.N, self.R)
+
+        # print(gain_zeta @ zeta)
 
         self.__assert_state_size(z)
         self.__assert_zeta_size(zeta)
@@ -68,6 +68,9 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         # Line 13 from main paper
         control_zeta = - gain_zeta @ zeta
+
+        if control_const is not None:
+            control_zeta += control_const
 
         # Substituting line 14 into line 9 from the main paper
         result = (N @ (A @ N.T - B @ gain) @ z) + (N @ B @ control_zeta) + (N @ A @ R.T @ zeta)
@@ -91,7 +94,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         return gain
 
-    def ode_gain_solve(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
+    def ode_gain_solve(self, gain=None, control_const=None, init_state=None,
                        time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
 
         self.time = time_space
@@ -100,20 +103,19 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         self.init_z_state = self.N @ _init_state
         self.zeta = self.R @ _init_state
 
-        gain = params['gain']
-
         # uses identity matrix for Q and R to get an initial lqr gain if gain is not specified
         _gain = self.gain_lqr() if (gain is None) else gain
         self.gain_z = _gain
 
-        result = odeint(self.z_dot_gain, self.init_z_state, self.time, args=(_gain,), printmessg=verbose)
+        result = odeint(self.z_dot_gain, self.init_z_state, self.time, args=(_gain, control_const), printmessg=verbose)
 
         z_states = np.asarray(result).transpose()
         d_z_states = np.asarray(
-            [self.z_dot_gain(state, time=t, gain=_gain) for (t, state) in zip(self.time, result)]
+            [self.z_dot_gain(state, time=t, gain=_gain, control_const=control_const) for (t, state) in
+             zip(self.time, result)]
         ).transpose()
 
-        cons_zeta = self.R.T @ (self.zeta - 1*self.zeta)  # TODO(Adding zeta makes state not tend to zero)
+        cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
 
         # Calibrating to remove constant zeta gain
         self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T

@@ -1,10 +1,11 @@
 import numpy as np
-from Constrained.LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
+
+from Constrained.ConstraintRiccatiSystem import ConstraintRiccatiSystem
 from OrthogonalDecomposition import matrix_rank, subspaces_from_svd
 
 # SOME INTERESTING SYSTEMS GENERATED FROM RANDOM SAMPLE
 
-constraint_system7 = LinearConstraintStateSpaceModel(
+ric_constraint_system7 = ConstraintRiccatiSystem(
     A=np.array([
         [3.5175e+00, 3.7784e+00, 3.9815e+00, 3.0900e-02, 6.0360e-01, 9.9000e-02, 3.3397e+00, 2.1230e-01],
         [3.3083e+00, 1.4009e+00, 7.3860e-01, 3.7526e+00, 3.3430e-01, 3.5030e-01, 3.2635e+00, 2.5944e+00],
@@ -44,7 +45,7 @@ constraint_system7 = LinearConstraintStateSpaceModel(
     init_state=np.array([4.3093, 2.0962, 2.8854, 2.2051, 4.1785, 4.9742, 3.3541, 0.6962])
 )
 
-constraint_system6 = LinearConstraintStateSpaceModel(
+ric_constraint_system6 = ConstraintRiccatiSystem(
     A=np.array([
         [1.3062, 3.5495, 3.4974, 1.277, 1.3043, 6.8957, 4.2683],
         [4.1653, 3.3022, 3.7618, 7.695, 7.699, 1.6591, 2.3765],
@@ -81,7 +82,7 @@ constraint_system6 = LinearConstraintStateSpaceModel(
     init_state=np.array([2.66094476, 4.05521636, 3.33001269, 2.76215208, 2.69931146, 3.6949612, 2.45076177])
 )
 
-constraint_system5 = LinearConstraintStateSpaceModel(
+ric_constraint_system5 = ConstraintRiccatiSystem(
     A=np.array([
         [0.29388389, 0.60619791, 0.61711047, 0.98134008, 0.8411186],
         [0.17693043, 0.03707734, 0.4704481, 0.37946392, 0.26073155],
@@ -111,7 +112,7 @@ constraint_system5 = LinearConstraintStateSpaceModel(
     ]),
     init_state=np.array([0.5473899, 0.94628836, 0.45888643, 0.86570615, 0.27199946])
 )
-constraint_system4 = LinearConstraintStateSpaceModel(
+ric_constraint_system4 = ConstraintRiccatiSystem(
     A=np.array([
         [0.79898356, 0.93832862, 0.30943309, 0.9329607, 0.52567468],
         [0.43480883, 0.77582657, 0.71322907, 0.56725567, 0.02921253],
@@ -143,7 +144,7 @@ constraint_system4 = LinearConstraintStateSpaceModel(
     init_state=np.array([0.56375954, 0.18230589, 0.46795963, 0.79780289, 0.0667068])
 )
 
-constraint_system3 = LinearConstraintStateSpaceModel(
+ric_constraint_system3 = ConstraintRiccatiSystem(
     A=np.array([
         [1.44, 1.9865, 1.6216, 0.339, 1.2941, 1.187],
         [1.3345, 1.1552, 1.5322, 1.9704, 1.965, 1.4749],
@@ -177,7 +178,7 @@ constraint_system3 = LinearConstraintStateSpaceModel(
     init_state=np.array([0.086, 0.9024, 0.2862, 0.0788, 0.7835, 0.0407])
 )
 
-constraint_system2 = LinearConstraintStateSpaceModel(
+ric_constraint_system2 = ConstraintRiccatiSystem(
     A=np.array([
         [-1.01416031, -0.85202817, -0.23718763],
         [-0.24703406, -1.20508211, 0.47151586],
@@ -197,7 +198,7 @@ constraint_system2 = LinearConstraintStateSpaceModel(
     init_state=np.array([3, 5, 10])
 )
 
-constraint_system1 = LinearConstraintStateSpaceModel(
+ric_constraint_system1 = ConstraintRiccatiSystem(
     A=np.eye(4),
     B=np.array([
         [0, 1 / 67, 0, 1 / 67],
@@ -211,7 +212,7 @@ constraint_system1 = LinearConstraintStateSpaceModel(
 )
 
 
-def random_system(n_size=4, u_size=3, k_size=4):
+def ric_random_system(n_size=4, u_size=3, k_size=4):
     n = n_size  # size of state vector
     u = u_size  # size of controller vector
     k = k_size  # number of constraints
@@ -243,4 +244,4 @@ def random_system(n_size=4, u_size=3, k_size=4):
     print(f"F:\n{F}\n")
     print(f"initial state:\n{state}\n")
 
-    return LinearConstraintStateSpaceModel(A=A, B=B, G=G, F=F, init_state=state)
+    return ConstraintRiccatiSystem(A=A, B=B, G=G, F=F, init_state=state)
