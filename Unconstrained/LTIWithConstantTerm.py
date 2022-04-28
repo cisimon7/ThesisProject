@@ -47,9 +47,11 @@ class LTIWithConstantTerm:
         A, B, c = self.A, self.B, self.c
 
         Q_xx = np.eye(self.state_size) if Q_xx is None else Q_xx
-        R_uu = np.eye(self.control_size) if R_uu is None else R_uu
-        x_init = np.round(np.random.randint(1, 10) * np.random.rand(self.state_size),
-                              4) if x_init is None else x_init
+        R_uu = 0.1 * np.eye(self.control_size) if R_uu is None else R_uu
+        x_init = np.round(
+            np.random.randint(1, 10) * np.random.rand(self.state_size),
+            4
+        ) if x_init is None else x_init
 
         K_x, K_o = self.lqr_gains(Q_xx, R_uu)
 
@@ -60,8 +62,8 @@ class LTIWithConstantTerm:
             args=(K_x, K_o)
         ))
 
-        calibration = np.linalg.pinv(A - B @ K_x) @ (B @ K_o - c)
-        x = np.asarray([x_ - calibration for x_ in x])
+        # calibration = np.linalg.pinv(A - B @ K_x) @ (B @ K_o - c)
+        # x = np.asarray([x_ - calibration for x_ in x])
 
         self.states = x.T
         self.controller = np.asarray([-(K_x @ x_) - K_o for x_ in x]).T

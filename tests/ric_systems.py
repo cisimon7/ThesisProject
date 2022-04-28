@@ -1,6 +1,6 @@
 import numpy as np
 
-from Constrained.ConstraintRiccatiSystem import ConstraintRiccatiSystem
+from Constrained.ConstraintRiccati import ConstraintRiccatiSystem
 from OrthogonalDecomposition import matrix_rank, subspaces_from_svd
 
 # SOME INTERESTING SYSTEMS GENERATED FROM RANDOM SAMPLE

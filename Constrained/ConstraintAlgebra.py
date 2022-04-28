@@ -1,6 +1,5 @@
 import numpy as np
 import plotly.graph_objects as go
-from control import lqr
 from scipy.integrate import odeint
 from plotly.subplots import make_subplots
 from typing import Optional
@@ -8,7 +7,7 @@ from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
 from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
-class ConstraintRiccatiSystem(LinearStateSpaceModel):
+class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
                  init_state: Optional[np.ndarray] = None):
@@ -49,44 +48,54 @@ class ConstraintRiccatiSystem(LinearStateSpaceModel):
 
         self.R, _, _, self.N = subspaces_from_svd(self.G)
 
-        self.init_z_state = None
-        self.zeta = self.R @ init_state  # constant
+        self.zeta = self.R @ init_state
+
+        self.gain_z = None  # gain for z state
+
+        self.gain_zeta = np.linalg.pinv(self.N @ self.B) @ self.N @ self.A @ self.R.T  # From Equation 13
 
     def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray, control_const: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
-        (z, zeta) = (state, self.zeta)
+        (z, zeta, gain_zeta) = (state, self.zeta, self.gain_zeta)
         (A, B, N, R) = (self.A, self.B, self.N, self.R)
+
+        # print(gain_zeta @ zeta)
 
         self.__assert_state_size(z)
         self.__assert_zeta_size(zeta)
         self.__assert_gain_size(gain)
 
+        # Line 13 from main paper
+        control_zeta = - gain_zeta @ zeta
+
+        if control_const is not None:
+            control_zeta += control_const
+
         # Substituting line 14 into line 9 from the main paper
-        result = (N @ (A @ N.T - B @ gain) @ z) + (N @ B @ control_const) + (N @ A @ R.T @ zeta)
+        result = (N @ (A @ N.T - B @ gain) @ z) + (N @ B @ control_zeta) + (N @ A @ R.T @ zeta)
 
         return result
 
-    def riccati_solve(self, Qz=None, Ru=None):
-        (Ac, Bc, zeta) = (self.A, self.B, self.zeta)
-        (N, R) = (self.N, self.R)
-        (A_nn, A_nr, B_n) = (N @ Ac @ N.T, N @ Ac @ R.T, N @ Bc)
+    def gain_lqr(self, A=None, B=None, Q=None, R=None, set_gain=True):
+        N = self.N
 
-        Qz = np.eye(A_nn.shape[0]) if Qz is None else Qz
-        Ru = np.eye(B_n.shape[1]) if Ru is None else Ru
+        _Q = np.eye(self.state_size - self.rank_G) if (Q is None) else Q
+        _R = np.eye(self.control_size) if (R is None) else R
 
-        iR = np.linalg.pinv(Ru)
+        _A = (N @ self.A @ N.T) if (A is None) else A
+        _B = (N @ self.B) if (B is None) else B
 
-        _, S, _ = lqr(A_nn, B_n, Qz, Ru)
-        s_z = - np.linalg.pinv((-0.5 * S @ B_n @ iR @ B_n.T) + (0.5 * A_nn)) @ (S @ A_nr @ zeta)
+        # TODO(Check for controllability of given matrix _A and _B)
 
-        K_z = iR @ B_n.T @ S
-        const = - iR @ B_n.T @ s_z  # - np.linalg.pinv(B_n) @ A_nr @ zeta
+        gain = super().gain_lqr(_A, _B, _Q, _R)
+        if set_gain:
+            self.gain_z = gain
 
-        return K_z, const, S, s_z
+        return gain
 
-    def ode_gain_solve(self, _gain=None, control_const=None, init_state=None,
-                       time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
+    def ode_gain(self, gain=None, control_const=None, init_state=None,
+                 time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
 
         self.time = time_space
 
@@ -94,8 +103,9 @@ class ConstraintRiccatiSystem(LinearStateSpaceModel):
         self.init_z_state = self.N @ _init_state
         self.zeta = self.R @ _init_state
 
-        if _gain is None:
-            _gain, control_const, _, _ = self.riccati_solve()
+        # uses identity matrix for Q and R to get an initial lqr gain if gain is not specified
+        _gain = self.gain_lqr() if (gain is None) else gain
+        self.gain_z = _gain
 
         result = odeint(self.z_dot_gain, self.init_z_state, self.time, args=(_gain, control_const), printmessg=verbose)
 

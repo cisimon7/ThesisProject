@@ -1,5 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
+from control import lqr
 from scipy.integrate import odeint
 from plotly.subplots import make_subplots
 from typing import Optional
@@ -7,13 +8,18 @@ from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
 from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
-class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
+class ConstraintRiccatiSystem(LinearStateSpaceModel):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
                  init_state: Optional[np.ndarray] = None):
         """
-        Initializes the system state space model and transforming System equation
-        taking into account the constraint matrix
+        x_dot = Ax + Bu + Fλ
+        G x_dot = 0
+        y = C @ x
+
+        to be transformed into the form:
+        z_dot = (N.T Ac N z) + (N.T B u) + (N.T Ac R ζ)
+        x = Nz + Rζ
         """
 
         super().__init__(A, B, C, D, init_state)  # Runs the init method of the super class LinearStateSpaceModel
@@ -34,7 +40,6 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         assert (k == self.state_size), "Constraint Jacobian Matrix cannot be added to state vector change"
         self.reaction_force_size = l
 
-        # TODO(Confirm if pseudo-inverse can be used in cases where G@F is rectangular)
         T = np.eye(self.state_size) - self.F @ (np.linalg.pinv(self.G @ self.F)) @ self.G
         self.A = T @ self.A  # Ac in paper, Equation 3
         self.B = T @ self.B  # Bc in paper, Equation 4
@@ -42,60 +47,58 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         self.state_size = A.shape[0]
         self.control_size = B.shape[1]
 
-        self.rank_G = matrix_rank(self.G)  # TODO(Rank can be retrieved from svd on line 52)
+        self.rank_G = matrix_rank(self.G)  # TODO(Rank can be retrieved from svd on line 49)
         assert (self.rank_G < self.state_size), \
             f"Invalid Null space size of G Constraint matrix: {self.state_size - self.rank_G}"
 
         self.R, _, _, self.N = subspaces_from_svd(self.G)
 
-        self.zeta = self.R @ init_state
+        # Denotation to avoid repetition
+        self.A_nn = self.N @ A @ self.N.T
+        self.A_nr = self.N @ A @ self.R.T
+        self.B_n = self.N @ B
 
-        self.gain_z = None  # gain for z state
+        self.init_z_state = None
+        self.zeta = 1 * self.R @ init_state  # constant
 
-        self.gain_zeta = np.linalg.pinv(self.N @ self.B) @ self.N @ self.A @ self.R.T  # From Equation 13
-
-    def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray, control_const: np.ndarray) -> np.ndarray:
+    def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
-        (z, zeta, gain_zeta) = (state, self.zeta, self.gain_zeta)
-        (A, B, N, R) = (self.A, self.B, self.N, self.R)
-
-        # print(gain_zeta @ zeta)
+        (z, zeta) = (state, self.zeta)
+        (A_nn, A_nr, B_n) = (self.A_nn, self.A_nr, self.B_n)
 
         self.__assert_state_size(z)
         self.__assert_zeta_size(zeta)
-        self.__assert_gain_size(gain)
+        self.__assert_gain_size(K_z)
 
-        # Line 13 from main paper
-        control_zeta = - gain_zeta @ zeta
+        z_dot = A_nn @ z + (B_n @ ((-K_z @ z) - k_0)) + (A_nr @ zeta)
+        return z_dot
 
-        if control_const is not None:
-            control_zeta += control_const
+    def riccati_solve(self, Qz=None, Ru=None):
+        """
+        J  = z.T Q z  +  u.T R u
+        J* = x.T Sxx x  + sx.T x
+        """
+        (A_nn, A_nr, B_n) = (self.A_nn, self.A_nr, self.B_n)
+        zeta = self.zeta
 
-        # Substituting line 14 into line 9 from the main paper
-        result = (N @ (A @ N.T - B @ gain) @ z) + (N @ B @ control_zeta) + (N @ A @ R.T @ zeta)
+        Q = np.eye(A_nn.shape[0]) if Qz is None else Qz
+        R = np.eye(B_n.shape[1]) if Ru is None else Ru
 
-        return result
+        R = 0.00001 * R
 
-    def gain_lqr(self, A=None, B=None, Q=None, R=None, set_gain=True):
-        N = self.N
+        iR = np.linalg.pinv(R)
 
-        _Q = np.eye(self.state_size - self.rank_G) if (Q is None) else Q
-        _R = np.eye(self.control_size) if (R is None) else R
+        _, S_nn, _ = lqr(A_nn, B_n, Q, R)
+        phi = - np.linalg.pinv(A_nn.T - S_nn @ B_n @ iR @ B_n.T) @ S_nn @ A_nr @ zeta
 
-        _A = (N @ self.A @ N.T) if (A is None) else A
-        _B = (N @ self.B) if (B is None) else B
+        k_z = iR @ B_n.T @ S_nn
+        k_0 = iR @ B_n.T @ phi
 
-        # TODO(Check for controllability of given matrix _A and _B)
+        return k_z, k_0
 
-        gain = super().gain_lqr(_A, _B, _Q, _R)
-        if set_gain:
-            self.gain_z = gain
-
-        return gain
-
-    def ode_gain_solve(self, gain=None, control_const=None, init_state=None,
-                       time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
+    def ode_solve(self, k_z=None, k_0=None, init_state=None, time_space: np.ndarray = np.linspace(0, 10, int(2E3)),
+                  verbose=False):
 
         self.time = time_space
 
@@ -103,28 +106,42 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         self.init_z_state = self.N @ _init_state
         self.zeta = self.R @ _init_state
 
-        # uses identity matrix for Q and R to get an initial lqr gain if gain is not specified
-        _gain = self.gain_lqr() if (gain is None) else gain
-        self.gain_z = _gain
+        (k_z, k_0) = self.riccati_solve() if (k_z is None or k_0 is None) else (k_z, k_0)
 
-        result = odeint(self.z_dot_gain, self.init_z_state, self.time, args=(_gain, control_const), printmessg=verbose)
+        result = np.asarray(odeint(
+            self.dynamics,
+            self.init_z_state,
+            self.time,
+            args=(k_z, k_0),
+            printmessg=verbose
+        ))
 
-        z_states = np.asarray(result).transpose()
-        d_z_states = np.asarray(
-            [self.z_dot_gain(state, time=t, gain=_gain, control_const=control_const) for (t, state) in
-             zip(self.time, result)]
-        ).transpose()
+        z_states = result.T
+        d_z_states = np.asarray([
+            self.dynamics(state, time=t, K_z=k_z, k_0=k_0)
+            for (t, state) in zip(self.time, result)
+        ]).transpose()
 
-        cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
+        # cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
+        # self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
 
-        # Calibrating to remove constant zeta gain
-        self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
+        self.states = z_states
         self.d_states = self.N.T @ d_z_states
 
-        self.controller = - _gain @ self.N @ self.states
-        self.output()
+        # self.controller = np.asarray([- (k_z @ z) + k_0 for z in z_states.T]).T
+        # self.output()
 
         return self.states, self.d_states
+
+    def pplot_states(self):
+        go.Figure(
+            data=[
+                go.Scatter(x=self.time, y=values, mode='lines', name=f"state-{i}")
+                for (i, values) in enumerate(self.states)
+            ],
+            layout=go.Layout(title=dict(text="z states", x=0.5), xaxis=dict(title='time'),
+                             yaxis=dict(title='states'))
+        ).show()
 
     def plot_states(self, titles=("x states", "x_dot states", "G @ x_dot")):
 

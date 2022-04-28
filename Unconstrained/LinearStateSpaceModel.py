@@ -67,6 +67,9 @@ class LinearStateSpaceModel:
     def output(self) -> np.ndarray:
         assert (self.controller is not None), "Controller not defined yet"
 
+        print(self.C.shape)
+        print(self.states.shape)
+
         result = self.C @ self.states + self.D @ self.controller
         self.output_states = result
         return result
@@ -90,8 +93,8 @@ class LinearStateSpaceModel:
     def gain_pole_placement(self, pole_locations: np.ndarray):
         pass
 
-    def ode_gain_solve(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
-                       time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
+    def ode_gain(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
+                 time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
 
         self.time = time_space
         _init_state = self.init_state if (init_state is None) else init_state

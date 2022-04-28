@@ -5,7 +5,7 @@ import numpy as np
 from control import lqe, lqr
 from scipy.integrate import odeint
 
-from LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
+from ConstraintAlgebra import LinearConstraintStateSpaceModel
 from RiccatiEquation import RiccatiEquation
 
 

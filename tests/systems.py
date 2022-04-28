@@ -1,5 +1,5 @@
 import numpy as np
-from Constrained.LinearConstraintStateSpaceModel import LinearConstraintStateSpaceModel
+from Constrained.ConstraintAlgebra import LinearConstraintStateSpaceModel
 from OrthogonalDecomposition import matrix_rank, subspaces_from_svd
 
 # SOME INTERESTING SYSTEMS GENERATED FROM RANDOM SAMPLE

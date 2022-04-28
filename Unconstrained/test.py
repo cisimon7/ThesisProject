@@ -1,6 +1,5 @@
 import numpy as np
 from unittest import TestCase
-from TimeInVaryingAffineSystem import TimeInVaryingAffineSystem
 from Unconstrained.LTIWithConstantTerm import LTIWithConstantTerm
 from Unconstrained.system import random_lti_system_with_const_term
 
