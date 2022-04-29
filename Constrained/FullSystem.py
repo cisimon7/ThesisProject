@@ -19,6 +19,7 @@ class FullSystem(LinearStateSpaceModel):
 
         to be transformed into the form:
         z_dot = (N.T Ac N z) + (N.T B u) + (N.T Ac R ζ)
+        zeta_dot = 0
         x = Nz + Rζ
         """
 
@@ -52,53 +53,68 @@ class FullSystem(LinearStateSpaceModel):
             f"Invalid Null space size of G Constraint matrix: {self.state_size - self.rank_G}"
 
         self.R, _, _, self.N = subspaces_from_svd(self.G)
+        (self.r, self.l) = (self.rank_G, self.state_size - self.rank_G)
+        (r, l) = (self.r, self.l)
 
         # Denotation to avoid repetition
         self.A_nn = self.N @ A @ self.N.T
         self.A_nr = self.N @ A @ self.R.T
         self.B_n = self.N @ B
 
+        # New A matrix
+        self.A_z_zeta = np.block([
+            [self.A_nn, self.A_nr],
+            [np.zeros((r, l)), np.zeros((r, r))]
+        ])
+
+        # New B matrix
+        self.B_z_zeta = np.block([
+            [self.B_n],
+            [np.zeros((r, self.control_size))]
+        ])
+
         self.init_z_state = None
-        self.zeta = 1 * self.R @ init_state  # constant
+        self.zeta = self.R @ init_state
 
     def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray) -> np.ndarray:
-        """Returns a vector of the state derivative vector at a given state and controller gain"""
+        """
+        :param state: a column vector of z and zeta states
+        :param time: needed for odeint, not needed for LTI systems
+        :param K_z: controller gain
+        :param k_0: controller constant gain
+        :return:
+        """
+        A, B = self.A_z_zeta, self.B_z_zeta
 
-        (z, zeta) = (state, self.zeta)
-        (A_nn, A_nr, B_n) = (self.A_nn, self.A_nr, self.B_n)
-
-        self.__assert_state_size(z)
-        self.__assert_zeta_size(zeta)
-        self.__assert_gain_size(K_z)
-
-        z_dot = A_nn @ z + (B_n @ ((-K_z @ z) - k_0)) + (A_nr @ zeta)
+        z_dot = A @ state + (B @ ((-K_z @ state) - k_0))
         return z_dot
 
-    def riccati_solve(self, Qz=None, Ru=None):
-        """
-        J  = z.T Q z  +  u.T R u
-        J* = x.T Sxx x  + sx.T x
-        """
-        (A_nn, A_nr, B_n) = (self.A_nn, self.A_nr, self.B_n)
-        zeta = self.zeta
+    def riccati_solve(self, Q=None, R=None):
+        A, B = self.A_z_zeta, self.B_z_zeta
+        (r, l) = (self.r, self.l)
 
-        Q = np.eye(A_nn.shape[0]) if Qz is None else Qz
-        R = np.eye(B_n.shape[1]) if Ru is None else Ru
+        # Q = np.block([
+        #     [np.eye(l), np.zeros((l, r))],
+        #     [np.zeros((r, l)), np.zeros((r, r))]
+        # ]) if Q is None else Q
+        Q = np.eye(A.shape[0])
+        R = np.eye(B.shape[1]) if R is None else R
 
-        R = 0.00001 * R
+        R = R
 
         iR = np.linalg.pinv(R)
 
-        _, S_nn, _ = lqr(A_nn, B_n, Q, R)
-        phi = - np.linalg.pinv(A_nn.T - S_nn @ B_n @ iR @ B_n.T) @ S_nn @ A_nr @ zeta
+        _, S_z_zeta, _ = lqr(np.ones_like(A), np.ones_like(B), Q, R)
 
-        k_z = iR @ B_n.T @ S_nn
-        k_0 = iR @ B_n.T @ phi
+        k_z = iR @ B.T @ S_z_zeta
+        k_0 = np.zeros((B.shape[1], 1))
 
         return k_z, k_0
 
-    def ode_solve(self, k_z=None, k_0=None, init_state=None, time_space: np.ndarray = np.linspace(0, 10, int(2E3)),
-                  verbose=False):
+    def ode_solve(self, k_z=None, k_0=None, init_state=None, time_space=np.linspace(0, 10, int(2E3)), verbose=False):
+        A, B = self.A_z_zeta, self.B_z_zeta
+        R, N = self.R, self.N
+        r, l = self.r, self.l
 
         self.time = time_space
 
@@ -106,27 +122,23 @@ class FullSystem(LinearStateSpaceModel):
         self.init_z_state = self.N @ _init_state
         self.zeta = self.R @ _init_state
 
+        init = np.r_[self.init_z_state, self.zeta]
+
         (k_z, k_0) = self.riccati_solve() if (k_z is None or k_0 is None) else (k_z, k_0)
 
         result = np.asarray(odeint(
             self.dynamics,
-            self.init_z_state,
+            init,
             self.time,
             args=(k_z, k_0),
             printmessg=verbose
         ))
 
-        z_states = result.T
-        d_z_states = np.asarray([
-            self.dynamics(state, time=t, K_z=k_z, k_0=k_0)
-            for (t, state) in zip(self.time, result)
-        ]).transpose()
+        z_zeta = result
+        x = np.block([[N.T, R.T]]) @ z_zeta
+        self.states = x
 
-        # cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
-        # self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
-
-        self.states = z_states
-        self.d_states = self.N.T @ d_z_states
+        # self.d_states = self.N.T @ d_z_states
 
         # self.controller = np.asarray([- (k_z @ z) + k_0 for z in z_states.T]).T
         # self.output()
@@ -169,20 +181,3 @@ class FullSystem(LinearStateSpaceModel):
             )
 
         fig.update_layout(showlegend=False, height=800).show()
-
-    def __assert_control_size(self, control: np.ndarray):
-        k = control.shape[0]
-        assert (k == self.control_size), "Transformed Control Vector shape error"
-
-    def __assert_gain_size(self, gain: np.ndarray):
-        (k, l) = gain.shape
-        assert (k == self.control_size), "Transformed Control Vector shape error"
-        assert (l == self.state_size - self.rank_G), "Transformed Control Vector shape error"
-
-    def __assert_state_size(self, state: np.ndarray):
-        k = state.shape[0]
-        assert (k == self.state_size - self.rank_G), "Transformed State Vector shape error"
-
-    def __assert_zeta_size(self, state: np.ndarray):
-        k = state.shape[0]
-        assert (k == self.rank_G), "Transformed State Vector shape error"
