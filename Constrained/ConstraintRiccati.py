@@ -24,6 +24,8 @@ class ConstraintRiccatiSystem(LinearStateSpaceModel):
 
         super().__init__(A, B, C, D, init_state)  # Runs the init method of the super class LinearStateSpaceModel
 
+        self.z_states = None
+
         assert (G is not None), "Constraint Matrix not specified. Consider using LinearStateSpaceModel"
         (k, l) = G.shape
         assert (l == self.state_size), "Constraint Matrix cannot be multiplied by state vector"
@@ -85,7 +87,7 @@ class ConstraintRiccatiSystem(LinearStateSpaceModel):
         Q = np.eye(A_nn.shape[0]) if Qz is None else Qz
         R = np.eye(B_n.shape[1]) if Ru is None else Ru
 
-        R = 0.00001 * R
+        R = 1 * R
 
         iR = np.linalg.pinv(R)
 
@@ -93,7 +95,7 @@ class ConstraintRiccatiSystem(LinearStateSpaceModel):
         phi = - np.linalg.pinv(A_nn.T - S_nn @ B_n @ iR @ B_n.T) @ S_nn @ A_nr @ zeta
 
         k_z = iR @ B_n.T @ S_nn
-        k_0 = iR @ B_n.T @ phi
+        k_0 = + np.linalg.pinv(B_n) @ A_nr @ zeta  # iR @ B_n.T @ phi
 
         return k_z, k_0
 
@@ -125,25 +127,28 @@ class ConstraintRiccatiSystem(LinearStateSpaceModel):
         # cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
         # self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
 
-        self.states = z_states
+        cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
+
+        self.z_states = z_states
+        self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
         self.d_states = self.N.T @ d_z_states
 
-        # self.controller = np.asarray([- (k_z @ z) + k_0 for z in z_states.T]).T
-        # self.output()
+        self.controller = np.asarray([- (k_z @ z) for z in z_states.T]).T
+        self.output()
 
         return self.states, self.d_states
 
-    def pplot_states(self):
+    def plot_states(self, title=()):
         go.Figure(
             data=[
                 go.Scatter(x=self.time, y=values, mode='lines', name=f"state-{i}")
-                for (i, values) in enumerate(self.states)
+                for (i, values) in enumerate(self.z_states)
             ],
             layout=go.Layout(title=dict(text="z states", x=0.5), xaxis=dict(title='time'),
                              yaxis=dict(title='states'))
         ).show()
 
-    def plot_states(self, titles=("x states", "x_dot states", "G @ x_dot")):
+    def plot_overview(self, titles=("x states", "x_dot states", "G @ x_dot")):
 
         assert (self.states is not None), "Run experiment before plotting"
         assert (self.d_states is not None), "Run experiment before plotting"

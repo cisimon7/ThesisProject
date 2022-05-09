@@ -5,7 +5,7 @@ import numpy as np
 from control import lqe, lqr
 from scipy.integrate import odeint
 
-from ConstraintAlgebra import LinearConstraintStateSpaceModel
+from ConstraintAlgebra import ConstraintAlgebra
 from RiccatiEquation import RiccatiEquation
 
 
@@ -17,7 +17,7 @@ class ZDotHatParams:
 
 class LTIConstraintStateEstimator:
 
-    def __init__(self, system: LinearConstraintStateSpaceModel):
+    def __init__(self, system: ConstraintAlgebra):
         self.system = system
         (N, R) = (system.N, system.R)  # NullSpace and RowSpace
         (A, B) = (system.A, system.B)  # (Ac, Bc)

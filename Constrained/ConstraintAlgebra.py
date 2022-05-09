@@ -7,7 +7,7 @@ from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
 from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
-class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
+class ConstraintAlgebra(LinearStateSpaceModel):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
                  init_state: Optional[np.ndarray] = None):
@@ -18,6 +18,8 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         super().__init__(A, B, C, D, init_state)  # Runs the init method of the super class LinearStateSpaceModel
 
+        self.init_z_state = None
+        self.z_states = None
         assert (G is not None), "Constraint Matrix not specified. Consider using LinearStateSpaceModel"
         (k, l) = G.shape
         assert (l == self.state_size), "Constraint Matrix cannot be multiplied by state vector"
@@ -110,6 +112,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
         result = odeint(self.z_dot_gain, self.init_z_state, self.time, args=(_gain, control_const), printmessg=verbose)
 
         z_states = np.asarray(result).transpose()
+        self.z_states = z_states
         d_z_states = np.asarray(
             [self.z_dot_gain(state, time=t, gain=_gain, control_const=control_const) for (t, state) in
              zip(self.time, result)]
@@ -126,7 +129,7 @@ class LinearConstraintStateSpaceModel(LinearStateSpaceModel):
 
         return self.states, self.d_states
 
-    def plot_states(self, titles=("x states", "x_dot states", "G @ x_dot")):
+    def plot_overview(self, titles=("x states", "x_dot states", "G @ x_dot")):
 
         assert (self.states is not None), "Run experiment before plotting"
         assert (self.d_states is not None), "Run experiment before plotting"
