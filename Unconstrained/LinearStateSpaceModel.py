@@ -150,15 +150,15 @@ class LinearStateSpaceModel:
                              xaxis=dict(title='time'), yaxis=dict(title='output states'))
         ).show()
 
-    def __assert_control_size(self, control: np.ndarray):
+    def assert_control_size(self, control: np.ndarray):
         k = control.shape[0]
         assert (k == self.control_size), "Control Vector shape error"
 
-    def __assert_gain_size(self, gain: np.ndarray):
+    def assert_gain_size(self, gain: np.ndarray):
         (k, l) = gain.shape
         assert (k == self.control_size), "Gain Vector shape error"
         assert (l == self.state_size), "Gain Vector shape error"
 
-    def __assert_state_size(self, state: np.ndarray):
+    def assert_state_size(self, state: np.ndarray):
         k = state.shape[0]
         assert (k == self.state_size), "State Vector shape error"

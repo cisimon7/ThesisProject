@@ -3,57 +3,22 @@ import plotly.graph_objects as go
 from scipy.integrate import odeint
 from plotly.subplots import make_subplots
 from typing import Optional
+
+from Constrained.BaseConstraint import BaseConstraint
 from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
 from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
-class ConstraintAlgebra(LinearStateSpaceModel):
+class ConstraintAlgebra(BaseConstraint):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
                  init_state: Optional[np.ndarray] = None):
-        """
-        Initializes the system state space model and transforming System equation
-        taking into account the constraint matrix
-        """
 
-        super().__init__(A, B, C, D, init_state)  # Runs the init method of the super class LinearStateSpaceModel
-
-        self.init_z_state = None
-        self.z_states = None
-        assert (G is not None), "Constraint Matrix not specified. Consider using LinearStateSpaceModel"
-        (k, l) = G.shape
-        assert (l == self.state_size), "Constraint Matrix cannot be multiplied by state vector"
-        self.constraint_size = k
-        self.G = G
-
-        if F is None:
-            print("Constraint Jacobian matrix not specified, setting to zero ...")
-            self.F = np.zeros_like(A)
-        else:
-            self.F = F
-
-        (k, l) = self.F.shape
-        assert (k == self.state_size), "Constraint Jacobian Matrix cannot be added to state vector change"
-        self.reaction_force_size = l
-
-        # TODO(Confirm if pseudo-inverse can be used in cases where G@F is rectangular)
-        T = np.eye(self.state_size) - self.F @ (np.linalg.pinv(self.G @ self.F)) @ self.G
-        self.A = T @ self.A  # Ac in paper, Equation 3
-        self.B = T @ self.B  # Bc in paper, Equation 4
-
-        self.state_size = A.shape[0]
-        self.control_size = B.shape[1]
-
-        self.rank_G = matrix_rank(self.G)  # TODO(Rank can be retrieved from svd on line 52)
-        assert (self.rank_G < self.state_size), \
-            f"Invalid Null space size of G Constraint matrix: {self.state_size - self.rank_G}"
-
-        self.R, _, _, self.N = subspaces_from_svd(self.G)
+        super().__init__(A, B, C, D, G, F, init_state)  # Runs the init method of the super class BaseConstraint
 
         self.zeta = self.R @ init_state
 
         self.gain_z = None  # gain for z state
-
         self.gain_zeta = np.linalg.pinv(self.N @ self.B) @ self.N @ self.A @ self.R.T  # From Equation 13
 
     def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray, control_const: np.ndarray) -> np.ndarray:
@@ -64,9 +29,9 @@ class ConstraintAlgebra(LinearStateSpaceModel):
 
         # print(gain_zeta @ zeta)
 
-        self.__assert_state_size(z)
-        self.__assert_zeta_size(zeta)
-        self.__assert_gain_size(gain)
+        self.assert_state_size(z)
+        self.assert_zeta_size(zeta)
+        self.assert_gain_size(gain)
 
         # Line 13 from main paper
         control_zeta = - gain_zeta @ zeta
@@ -128,47 +93,3 @@ class ConstraintAlgebra(LinearStateSpaceModel):
         self.output()
 
         return self.states, self.d_states
-
-    def plot_overview(self, titles=("x states", "x_dot states", "G @ x_dot")):
-
-        assert (self.states is not None), "Run experiment before plotting"
-        assert (self.d_states is not None), "Run experiment before plotting"
-
-        fig = make_subplots(rows=1, cols=3, subplot_titles=titles)
-
-        for values in self.states:
-            fig.add_trace(
-                go.Scatter(x=self.time, y=values, mode='lines'),
-                row=1, col=1
-            )
-
-        for values in self.d_states:
-            fig.add_trace(
-                go.Scatter(x=self.time, y=values, mode='lines'),
-                row=1, col=2
-            )
-
-        for values in (self.G @ self.d_states):
-            fig.add_trace(
-                go.Scatter(x=self.time, y=values, mode='lines'),
-                row=1, col=3
-            )
-
-        fig.update_layout(showlegend=False, height=800).show()
-
-    def __assert_control_size(self, control: np.ndarray):
-        k = control.shape[0]
-        assert (k == self.control_size), "Transformed Control Vector shape error"
-
-    def __assert_gain_size(self, gain: np.ndarray):
-        (k, l) = gain.shape
-        assert (k == self.control_size), "Transformed Control Vector shape error"
-        assert (l == self.state_size - self.rank_G), "Transformed Control Vector shape error"
-
-    def __assert_state_size(self, state: np.ndarray):
-        k = state.shape[0]
-        assert (k == self.state_size - self.rank_G), "Transformed State Vector shape error"
-
-    def __assert_zeta_size(self, state: np.ndarray):
-        k = state.shape[0]
-        assert (k == self.rank_G), "Transformed State Vector shape error"
