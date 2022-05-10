@@ -1,13 +1,8 @@
+from typing import Optional
 import numpy as np
-import plotly.graph_objects as go
 from control import lqr
 from scipy.integrate import odeint
-from plotly.subplots import make_subplots
-from typing import Optional
-
 from Constrained.BaseConstraint import BaseConstraint
-from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
-from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
 class ConstraintRiccatiSystem(BaseConstraint):
@@ -21,7 +16,11 @@ class ConstraintRiccatiSystem(BaseConstraint):
         self.A_nr = self.N @ A @ self.R.T
         self.B_n = self.N @ B
 
-        self.zeta = 1 * self.R @ init_state  # constant
+        self.zeta = self.R @ init_state  # constant
+
+        self.alpha = 1
+        self.ext_u0 = True
+        self.U_0 = np.linalg.pinv(self.B_n) @ self.A_nr @ self.zeta
 
     def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
@@ -47,7 +46,8 @@ class ConstraintRiccatiSystem(BaseConstraint):
         Q = np.eye(A_nn.shape[0]) if Qz is None else Qz
         R = np.eye(B_n.shape[1]) if Ru is None else Ru
 
-        R = 1 * R
+        if not self.ext_u0:
+            R = self.alpha * R
 
         iR = np.linalg.pinv(R)
 
@@ -55,7 +55,12 @@ class ConstraintRiccatiSystem(BaseConstraint):
         phi = - np.linalg.pinv(A_nn.T - S_nn @ B_n @ iR @ B_n.T) @ S_nn @ A_nr @ zeta
 
         k_z = iR @ B_n.T @ S_nn
-        k_0 = + np.linalg.pinv(B_n) @ A_nr @ zeta  # iR @ B_n.T @ phi
+
+        if self.ext_u0:
+            k_0 = + self.U_0
+        else:
+            print("phi")
+            k_0 = iR @ B_n.T @ phi
 
         return k_z, k_0
 

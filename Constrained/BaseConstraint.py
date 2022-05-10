@@ -53,14 +53,17 @@ class BaseConstraint(LinearStateSpaceModel):
 
         self.R, _, _, self.N = subspaces_from_svd(self.G)
 
+    def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray):
+        pass
+
     def plot_states(self, title=()):
         go.Figure(
             data=[
-                go.Scatter(x=self.time, y=values, mode='lines', name=f"state-{i}")
+                go.Scatter(x=self.time, y=values, mode='lines', name=f"z-state [{i}]")
                 for (i, values) in enumerate(self.z_states)
             ],
-            layout=go.Layout(title=dict(text="z states", x=0.5), xaxis=dict(title='time'),
-                             yaxis=dict(title='states'))
+            layout=go.Layout(showlegend=True, title=dict(text="z states", x=0.5), legend=dict(orientation='h'),
+                             xaxis=dict(title='time'), yaxis=dict(title='z - states'))
         ).show()
 
     def plot_overview(self, titles=("x states", "x_dot states", "G @ x_dot")):

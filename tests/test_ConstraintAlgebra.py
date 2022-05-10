@@ -35,7 +35,7 @@ class TestConstraintAlgebra(TestCase):
     def test_system6(self):
         system = ConstraintAlgebra(**system6)
         system.ode_gain(time_space=np.linspace(0, 5, int(2E3)))
-        # system.plot_states()
+        system.plot_states()
         system.plot_controller()
         system.plot_output()
 
@@ -47,7 +47,7 @@ class TestConstraintAlgebra(TestCase):
         system.plot_output()
 
     def test_random_system(self):
-        system = random_system(n_size=6, u_size=5, k_size=4)
+        system = ConstraintAlgebra(**random_system(n_size=5, u_size=3, k_size=4))
         system.ode_gain(time_space=np.linspace(0, 10, int(2E3)))
         # system.plot_states()
         # system.plot_controller()

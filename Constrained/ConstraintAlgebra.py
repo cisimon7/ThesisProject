@@ -1,12 +1,7 @@
 import numpy as np
-import plotly.graph_objects as go
-from scipy.integrate import odeint
-from plotly.subplots import make_subplots
 from typing import Optional
-
+from scipy.integrate import odeint
 from Constrained.BaseConstraint import BaseConstraint
-from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
-from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 
 
 class ConstraintAlgebra(BaseConstraint):
@@ -21,26 +16,24 @@ class ConstraintAlgebra(BaseConstraint):
         self.gain_z = None  # gain for z state
         self.gain_zeta = np.linalg.pinv(self.N @ self.B) @ self.N @ self.A @ self.R.T  # From Equation 13
 
-    def z_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray, control_const: np.ndarray) -> np.ndarray:
+    def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
         (z, zeta, gain_zeta) = (state, self.zeta, self.gain_zeta)
         (A, B, N, R) = (self.A, self.B, self.N, self.R)
 
-        # print(gain_zeta @ zeta)
-
         self.assert_state_size(z)
         self.assert_zeta_size(zeta)
-        self.assert_gain_size(gain)
+        self.assert_gain_size(K_z)
 
         # Line 13 from main paper
         control_zeta = - gain_zeta @ zeta
 
-        if control_const is not None:
-            control_zeta += control_const
+        if k_0 is not None:
+            control_zeta += k_0
 
         # Substituting line 14 into line 9 from the main paper
-        result = (N @ (A @ N.T - B @ gain) @ z) + (N @ B @ control_zeta) + (N @ A @ R.T @ zeta)
+        result = (N @ (A @ N.T - B @ K_z) @ z) + (N @ B @ control_zeta) + (N @ A @ R.T @ zeta)
 
         return result
 
@@ -74,12 +67,12 @@ class ConstraintAlgebra(BaseConstraint):
         _gain = self.gain_lqr() if (gain is None) else gain
         self.gain_z = _gain
 
-        result = odeint(self.z_dot_gain, self.init_z_state, self.time, args=(_gain, control_const), printmessg=verbose)
+        result = odeint(self.dynamics, self.init_z_state, self.time, args=(_gain, control_const), printmessg=verbose)
 
         z_states = np.asarray(result).transpose()
         self.z_states = z_states
         d_z_states = np.asarray(
-            [self.z_dot_gain(state, time=t, gain=_gain, control_const=control_const) for (t, state) in
+            [self.dynamics(state, time=t, K_z=_gain, k_0=control_const) for (t, state) in
              zip(self.time, result)]
         ).transpose()
 
