@@ -2,11 +2,9 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-from control import lqe, lqr
 from scipy.integrate import odeint
 
 from ConstraintAlgebra import ConstraintAlgebra
-from RiccatiEquation import RiccatiEquation
 
 
 @dataclass

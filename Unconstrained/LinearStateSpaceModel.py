@@ -49,8 +49,8 @@ class LinearStateSpaceModel:
     def xdot(self, state: np.ndarray, time: float, control: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and control input"""
 
-        self.__assert_state_size(state)
-        self.__assert_control_size(control)
+        self.assert_state_size(state)
+        self.assert_control_size(control)
         return (self.A @ state) + (self.B @ control)
 
     def x_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray = None) -> np.ndarray:
@@ -59,8 +59,8 @@ class LinearStateSpaceModel:
         # uses identity matrix Q and R to get an initial lqr gain if gain is not specified
         _gain = self.gain_lqr() if (gain is None) else gain
 
-        self.__assert_state_size(state)
-        self.__assert_control_size(_gain)
+        self.assert_state_size(state)
+        self.assert_control_size(_gain)
 
         return (self.A - self.B @ _gain) @ state
 

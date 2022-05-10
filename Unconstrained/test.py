@@ -14,6 +14,7 @@ class TestTimeInVaryingAffineSystem(TestCase):
             B=np.eye(4),
             c=2 * np.ones(4).T
         )
+        system.alpha = 1
         system.ode_solve(time_space=np.linspace(0, 10, int(2E3)))
         system.plot_states()
         # system.plot_controller()

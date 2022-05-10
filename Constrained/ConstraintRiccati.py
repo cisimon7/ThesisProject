@@ -59,7 +59,6 @@ class ConstraintRiccatiSystem(BaseConstraint):
         if self.ext_u0:
             k_0 = + self.U_0
         else:
-            print("phi")
             k_0 = iR @ B_n.T @ phi
 
         return k_z, k_0

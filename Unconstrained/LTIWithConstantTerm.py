@@ -17,6 +17,8 @@ class LTIWithConstantTerm:
         self.time_space = None
         self.controller = None
 
+        self.alpha = 1
+
     def dynamics(self, x, t, K_x, K_o):
         A, B, c = self.A, self.B, self.c
 
@@ -31,13 +33,14 @@ class LTIWithConstantTerm:
         J = x.T S_xx x + s_x.T x
         """
         A, B, c = self.A, self.B, self.c
+        R_uu = self.alpha * R_uu
         iR = np.linalg.pinv(R_uu)
 
         _, S_xx, _ = lqr(A, B, Q_xx, R_uu)
-        s_x = - 2 * np.linalg.pinv(A.T - S_xx @ B @ iR @ B.T) @ S_xx @ c
+        s_x = - 0 * 2 * np.linalg.pinv(A.T - S_xx @ B @ iR @ B.T) @ S_xx @ c
 
         K_x = iR @ B.T @ S_xx
-        K_o = 0.5 * iR @ B.T @ s_x
+        K_o = np.linalg.pinv(B) @ c  # 0.5 * iR @ B.T @ s_x
 
         return K_x, K_o
 
