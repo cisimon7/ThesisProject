@@ -18,8 +18,7 @@ if __name__ == '__main__':
         init_state=np.asarray([1, 1])
     )
     mass_spring.ode_gain(
-        params=dict(gain=np.asarray([[2, 1]])),
-        time_space=np.linspace(0, 20, int(2E3))
+        params=dict(control=np.asarray([[1] for _ in mass_spring.time]), gain=np.asarray([[2, 1]]))
     )
 
     mass_spring.plot_states()

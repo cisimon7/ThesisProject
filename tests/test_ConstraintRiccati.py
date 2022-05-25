@@ -41,7 +41,7 @@ class TestRiccatiEquation(TestCase):
     def test_system6(self):
         system = ConstraintRiccatiSystem(**system6)
         system.alpha = 0.000001
-        system.ext_u0 = False
+        system.ext_u0 = True
         system.ode_solve(time_space=np.linspace(0, 5, int(2E3)))
         system.plot_states()
         # system.plot_output()
@@ -52,7 +52,7 @@ class TestRiccatiEquation(TestCase):
         system.alpha = 1
         system.ext_u0 = True
         system.ode_solve(time_space=np.linspace(0, 5, int(2E3)))
-        # system.plot_states()
+        system.plot_states()
         # system.plot_output()
         # system.plot_controller()
 
@@ -62,5 +62,5 @@ class TestRiccatiEquation(TestCase):
         system.ext_u0 = True
         system.ode_solve(time_space=np.linspace(0, 10, int(2E3)))
         system.plot_states()
-        system.plot_output()
-        system.plot_controller()
+        # system.plot_output()
+        # system.plot_controller()

@@ -35,7 +35,7 @@ class LinearStateSpaceModel:
         self.D = D
 
         # Default simulation time
-        self.time: np.ndarray = np.linspace(0, 10, int(20))
+        self.time: np.ndarray = np.linspace(0, 10, int(2E3))
 
         # Initial state of the system
         self.init_state: Optional[np.ndarray] = np.zeros(self.state_size) if (init_state is None) else init_state
@@ -46,12 +46,16 @@ class LinearStateSpaceModel:
         self.controller = None
         self.output_states = None
 
-    def xdot(self, state: np.ndarray, time: float, control: np.ndarray) -> np.ndarray:
+    def xdot(self, state: np.ndarray, time, control: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and control input"""
 
+        print(int(time))
+        u = np.asarray(control[0])
+
         self.assert_state_size(state)
-        self.assert_control_size(control)
-        return (self.A @ state) + (self.B @ control)
+        self.assert_control_size(u)
+
+        return (self.A @ np.c_[state]).ravel() + (self.B @ u).ravel()
 
     def x_dot_gain(self, state: np.ndarray, time: float, gain: np.ndarray = None) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
@@ -66,9 +70,6 @@ class LinearStateSpaceModel:
 
     def output(self) -> np.ndarray:
         assert (self.controller is not None), "Controller not defined yet"
-
-        print(self.C.shape)
-        print(self.states.shape)
 
         result = self.C @ self.states + self.D @ self.controller
         self.output_states = result
@@ -93,22 +94,31 @@ class LinearStateSpaceModel:
     def gain_pole_placement(self, pole_locations: np.ndarray):
         pass
 
-    def ode_gain(self, params: Dict[str, Any] = dict(gain=None), init_state=None,
-                 time_space: np.ndarray = np.linspace(0, 10, int(2E3)), verbose=False):
+    def ode_gain(self, params: Dict[str, np.ndarray] = dict(control=None, gain=None), init_state=None, verbose=False):
 
-        self.time = time_space
         _init_state = self.init_state if (init_state is None) else init_state
 
-        gain = params['gain']
-        result = odeint(self.x_dot_gain, _init_state, self.time, args=(gain,), printmessg=verbose)
+        control = params['control']
+        if control is not None:
+            assert len(self.time) == len(control)
+            time = np.linspace(start=0, stop=len(self.time), num=1+len(self.time))[:-1]
 
-        self.states = np.asarray(result).transpose()
-        self.d_states = np.asarray(
-            [self.x_dot_gain(state, time=t, gain=gain) for (t, state) in zip(self.time, result)]
-        ).transpose()
+            result = odeint(self.xdot, _init_state, time, args=(control,), printmessg=verbose)
+            self.states = np.asarray(result).transpose()
+            self.d_states = np.asarray(
+                [self.xdot(state, time=t, control=control) for (t, state) in zip(time, result)]
+            ).transpose()
+            self.controller = control.T
+        else:
+            gain = params['gain']
+            result = odeint(self.x_dot_gain, _init_state, self.time, args=(gain,), printmessg=verbose)
 
-        # u = -K x
-        self.controller = - gain @ self.states
+            self.states = np.asarray(result).transpose()
+            self.d_states = np.asarray(
+                [self.x_dot_gain(state, time=t, gain=gain) for (t, state) in zip(self.time, result)]
+            ).transpose()
+            self.controller = - gain @ self.states
+
         self.output()
 
         return result
@@ -136,7 +146,7 @@ class LinearStateSpaceModel:
 
     def plot_controller(self, title="Controller Plot"):
         go.Figure(
-            data=[go.Scatter(x=self.time, y=cont, name=f'control input [{i}]') for (i, cont) in
+            data=[go.Scatter(x=self.time, y=cont, name=f'control input [{i + 1}]') for (i, cont) in
                   enumerate(self.controller)],
             layout=go.Layout(showlegend=True, title=dict(text=title, x=0.5), legend=dict(orientation='h'),
                              xaxis=dict(title='time'), yaxis=dict(title='controller size'))
@@ -144,7 +154,7 @@ class LinearStateSpaceModel:
 
     def plot_output(self, title="Output Plot"):
         go.Figure(
-            data=[go.Scatter(x=self.time, y=output, name=f'output state [{i}]') for (i, output) in
+            data=[go.Scatter(x=self.time, y=output, mode="lines", name=f'output state [{i + 1}]') for (i, output) in
                   enumerate(self.output_states)],
             layout=go.Layout(showlegend=True, title=dict(text=title, x=0.5), legend=dict(orientation='h'),
                              xaxis=dict(title='time'), yaxis=dict(title='output states'))
@@ -153,6 +163,7 @@ class LinearStateSpaceModel:
     def assert_control_size(self, control: np.ndarray):
         k = control.shape[0]
         assert (k == self.control_size), "Control Vector shape error"
+        # assert (l == self.state_size), "Control Vector shape error"
 
     def assert_gain_size(self, gain: np.ndarray):
         (k, l) = gain.shape
