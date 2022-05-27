@@ -11,8 +11,6 @@ class ConstraintAlgebra(BaseConstraint):
 
         super().__init__(A, B, C, D, G, F, init_state)  # Runs the init method of the super class BaseConstraint
 
-        self.zeta = self.R @ init_state
-
         self.gain_z = None  # gain for z state
         self.gain_zeta = np.linalg.pinv(self.N @ self.B) @ self.N @ self.A @ self.R.T  # From Equation 13
 

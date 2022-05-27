@@ -8,15 +8,15 @@ from Constrained.BaseConstraint import BaseConstraint
 class ConstraintRiccatiSystem(BaseConstraint):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
-                 init_state: Optional[np.ndarray] = None):
-        super().__init__(A, B, C, D, G, F, init_state)  # Runs the init method of the super class BaseConstraint
+                 init_state: Optional[np.ndarray] = None, x_desired: Optional[np.ndarray] = None,
+                 dx_desired: Optional[np.ndarray] = None):
+        # Runs the init method of the super class BaseConstraint
+        super().__init__(A, B, C, D, G, F, init_state, x_desired, dx_desired)
 
         # Denotation to avoid repetition
         self.A_nn = self.N @ A @ self.N.T
         self.A_nr = self.N @ A @ self.R.T
         self.B_n = self.N @ B
-
-        self.zeta = self.R @ init_state  # constant
 
         self.alpha = 1
         self.ext_u0 = True
@@ -25,14 +25,14 @@ class ConstraintRiccatiSystem(BaseConstraint):
     def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
-        (z, zeta) = (state, self.zeta)
+        (z, zeta) = (state - (self.N @ self.x_desired), self.zeta)
         (A_nn, A_nr, B_n) = (self.A_nn, self.A_nr, self.B_n)
 
         self.assert_state_size(z)
         self.assert_zeta_size(zeta)
         self.assert_gain_size(K_z)
 
-        z_dot = A_nn @ z + (B_n @ ((-K_z @ z) - k_0)) + (A_nr @ zeta)
+        z_dot = A_nn @ z + (B_n @ ((-K_z @ z) - k_0)) + (A_nr @ zeta) + (self.N @ self.dx_desired)
         return z_dot
 
     def riccati_solve(self, Qz=None, Ru=None):

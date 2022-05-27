@@ -9,7 +9,8 @@ from plotly.subplots import make_subplots
 class LinearStateSpaceModel:
 
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
-                 D: Optional[np.ndarray] = None, init_state: Optional[np.ndarray] = None):
+                 D: Optional[np.ndarray] = None, init_state: Optional[np.ndarray] = None,
+                 x_desired: Optional[np.ndarray] = None, dx_desired: Optional[np.ndarray] = None):
         """Initializes the control system state space model and checks all sizes match"""
         (m, n) = A.shape
         assert (m == n), "System Matrix A not a square matrix"
@@ -40,6 +41,9 @@ class LinearStateSpaceModel:
         # Initial state of the system
         self.init_state: Optional[np.ndarray] = np.zeros(self.state_size) if (init_state is None) else init_state
 
+        self.x_desired = np.zeros(self.state_size) if (x_desired is None) else x_desired.ravel()
+        self.dx_desired = np.zeros(self.state_size) if (dx_desired is None) else dx_desired.ravel()
+
         self.states: Optional[np.ndarray] = None  # Holds values of state after simulation with odeint
         self.d_states: Optional[np.ndarray] = None  # Holds values of state derivative after simulation with odeint
 
@@ -68,10 +72,12 @@ class LinearStateSpaceModel:
 
         return (self.A - self.B @ _gain) @ state
 
-    def output(self) -> np.ndarray:
+    def output(self, states=None) -> np.ndarray:
         assert (self.controller is not None), "Controller not defined yet"
 
-        result = self.C @ self.states + self.D @ self.controller
+        states = self.states if (states is None) else states
+
+        result = (self.C @ states) + (self.D @ self.controller)
         self.output_states = result
         return result
 
@@ -101,7 +107,7 @@ class LinearStateSpaceModel:
         control = params['control']
         if control is not None:
             assert len(self.time) == len(control)
-            time = np.linspace(start=0, stop=len(self.time), num=1+len(self.time))[:-1]
+            time = np.linspace(start=0, stop=len(self.time), num=1 + len(self.time))[:-1]
 
             result = odeint(self.xdot, _init_state, time, args=(control,), printmessg=verbose)
             self.states = np.asarray(result).transpose()
@@ -154,8 +160,13 @@ class LinearStateSpaceModel:
 
     def plot_output(self, title="Output Plot"):
         go.Figure(
-            data=[go.Scatter(x=self.time, y=output, mode="lines", name=f'output state [{i + 1}]') for (i, output) in
-                  enumerate(self.output_states)],
+            data=[
+                     go.Scatter(x=self.time, y=output, mode="lines", name=f'output state [{i + 1}]')
+                     for (i, output) in enumerate(self.output_states)
+                 ] + [
+                     go.Scatter(x=self.time, y=values, line=dict(width=2, dash='5px'), name=f'desired [{i + 1}]')
+                     for (i, values) in enumerate(self.output(np.asarray([self.x_desired for _ in self.time]).T))
+                 ],
             layout=go.Layout(showlegend=True, title=dict(text=title, x=0.5), legend=dict(orientation='h'),
                              xaxis=dict(title='time'), yaxis=dict(title='output states'))
         ).show()

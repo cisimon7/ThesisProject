@@ -9,7 +9,8 @@ from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 class BaseConstraint(LinearStateSpaceModel):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
-                 init_state: Optional[np.ndarray] = None):
+                 init_state: Optional[np.ndarray] = None, x_desired: Optional[np.ndarray] = None,
+                 dx_desired: Optional[np.ndarray] = None):
         """
         x_dot = Ax + Bu + Fλ
         G x_dot = 0
@@ -19,7 +20,8 @@ class BaseConstraint(LinearStateSpaceModel):
         z_dot = (N.T Ac N z) + (N.T B u) + (N.T Ac R ζ)
         x = Nz + Rζ
         """
-        super().__init__(A, B, C, D, init_state)  # Runs the init method of the super class LinearStateSpaceModel
+        # Runs the init method of the super class LinearStateSpaceModel
+        super().__init__(A, B, C, D, init_state, x_desired, dx_desired)
 
         self.z_states = None
         self.init_z_state = None
@@ -53,16 +55,51 @@ class BaseConstraint(LinearStateSpaceModel):
 
         self.R, _, _, self.N = subspaces_from_svd(self.G)
 
+        self.zeta = self.R @ self.init_state  # constant
+
     def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray):
         pass
+
+    # def output(self, states=None) -> np.ndarray:
+    #     assert (self.controller is not None), "Controller not defined yet"
+    #
+    #     states = self.states if (states is None) else states
+    #
+    #     result = (self.C @ states) + (self.D @ self.controller) - (self.C @ self.R.T @ np.asarray([self.zeta for _ in states.T]).T)
+    #     self.output_states = result
+    #     return result
+
+    def z_output(self, z_states=None) -> np.ndarray:
+        assert (self.controller is not None), "Controller not defined yet"
+
+        z_states = self.z_states if (z_states is None) else z_states
+
+        result = (self.C @ self.N.T @ z_states) + (self.D @ self.controller)
+        return result
 
     def plot_states(self, title=()):
         go.Figure(
             data=[
                 go.Scatter(x=self.time, y=values, mode='lines', name=f"z-state [{i}]")
                 for (i, values) in enumerate(self.z_states)
+            ] + [
+                go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px'))
+                for (i, values) in enumerate(self.N @ self.x_desired)
             ],
             layout=go.Layout(showlegend=True, title=dict(text="z states", x=0.5), legend=dict(orientation='h'),
+                             xaxis=dict(title='time'), yaxis=dict(title='z - states'))
+        ).show()
+
+    def plot_z_output(self, title=()):
+        go.Figure(
+            data=[
+                go.Scatter(x=self.time, y=values, mode='lines', name=f"z-state [{i}]")
+                for (i, values) in enumerate(self.z_output())
+            ] + [
+                go.Scatter(x=self.time, y=values, line=dict(width=2, dash='5px'), name=f"desired [{i}]")
+                for (i, values) in enumerate(self.z_output(np.asarray([self.N @ self.x_desired for _ in self.time]).T))
+            ],
+            layout=go.Layout(showlegend=True, title=dict(text="z output states", x=0.5), legend=dict(orientation='h'),
                              xaxis=dict(title='time'), yaxis=dict(title='z - states'))
         ).show()
 
@@ -79,9 +116,21 @@ class BaseConstraint(LinearStateSpaceModel):
                 row=1, col=1
             )
 
+        for values in self.x_desired:
+            fig.add_trace(
+                go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px')),
+                row=1, col=1
+            )
+
         for values in self.d_states:
             fig.add_trace(
                 go.Scatter(x=self.time, y=values, mode='lines'),
+                row=1, col=2
+            )
+
+        for values in self.x_desired:
+            fig.add_trace(
+                go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px')),
                 row=1, col=2
             )
 
