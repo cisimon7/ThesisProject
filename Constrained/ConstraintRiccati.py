@@ -7,11 +7,11 @@ from Constrained.BaseConstraint import BaseConstraint
 
 class ConstraintRiccatiSystem(BaseConstraint):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
-                 D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
+                 D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None, g=None,
                  init_state: Optional[np.ndarray] = None, x_desired: Optional[np.ndarray] = None,
                  dx_desired: Optional[np.ndarray] = None):
         # Runs the init method of the super class BaseConstraint
-        super().__init__(A, B, C, D, G, F, init_state, x_desired, dx_desired)
+        super().__init__(A, B, C, D, G, F, g, init_state, x_desired, dx_desired)
 
         # Denotation to avoid repetition
         self.A_nn = self.N @ A @ self.N.T
@@ -25,7 +25,7 @@ class ConstraintRiccatiSystem(BaseConstraint):
     def dynamics(self, state: np.ndarray, time: float, K_z: np.ndarray, k_0: np.ndarray) -> np.ndarray:
         """Returns a vector of the state derivative vector at a given state and controller gain"""
 
-        (z, zeta) = (state - (self.N @ self.x_desired), self.zeta)
+        (z, zeta) = (state - (self.N @ self.x_desired), self.zeta - (self.R @ self.x_desired))
         (A_nn, A_nr, B_n) = (self.A_nn, self.A_nr, self.B_n)
 
         self.assert_state_size(z)
@@ -67,7 +67,7 @@ class ConstraintRiccatiSystem(BaseConstraint):
                   verbose=False):
         self.time = time_space
 
-        _init_state = self.init_state if (init_state is None) else init_state
+        _init_state = self.init_state.flatten() if (init_state is None) else init_state
         self.init_z_state = self.N @ _init_state
         self.zeta = self.R @ _init_state
 
@@ -81,20 +81,23 @@ class ConstraintRiccatiSystem(BaseConstraint):
             printmessg=verbose
         ))
 
+        print(f"{(self.R @ self.init_state).flatten() - (self.R @ self.x_desired).flatten()}")
+
         z_states = result.T
-        d_z_states = np.asarray([
+        dz_states = np.asarray([
             self.dynamics(state, time=t, K_z=k_z, k_0=k_0)
             for (t, state) in zip(self.time, result)
         ]).transpose()
+        self.dz_states = dz_states
 
         # cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
         # self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
 
-        cons_zeta = self.R.T @ self.zeta * 0  # TODO(Adding zeta makes state not tend to zero)
+        cons_zeta = self.R.T @ self.zeta
 
         self.z_states = z_states
         self.states = self.N.T @ z_states + np.asarray([cons_zeta for _ in range(z_states.shape[1])]).T
-        self.d_states = self.N.T @ d_z_states
+        self.d_states = self.N.T @ dz_states
 
         self.controller = np.asarray([- (k_z @ z) for z in z_states.T]).T
         self.output()

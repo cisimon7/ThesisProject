@@ -1,5 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 from typing import Optional
 from Unconstrained.LinearStateSpaceModel import LinearStateSpaceModel
@@ -9,7 +10,7 @@ from OrthogonalDecomposition import subspaces_from_svd, matrix_rank
 class BaseConstraint(LinearStateSpaceModel):
     def __init__(self, A: np.ndarray, B: Optional[np.ndarray] = None, C: Optional[np.ndarray] = None,
                  D: Optional[np.ndarray] = None, G: Optional[np.ndarray] = None, F: Optional[np.ndarray] = None,
-                 init_state: Optional[np.ndarray] = None, x_desired: Optional[np.ndarray] = None,
+                 g=None, init_state: Optional[np.ndarray] = None, x_desired: Optional[np.ndarray] = None,
                  dx_desired: Optional[np.ndarray] = None):
         """
         x_dot = Ax + Bu + Fλ
@@ -24,6 +25,7 @@ class BaseConstraint(LinearStateSpaceModel):
         super().__init__(A, B, C, D, init_state, x_desired, dx_desired)
 
         self.z_states = None
+        self.dz_states = None
         self.init_z_state = None
 
         assert (G is not None), "Constraint Matrix not specified. Consider using LinearStateSpaceModel"
@@ -31,6 +33,8 @@ class BaseConstraint(LinearStateSpaceModel):
         assert (l == self.state_size), "Constraint Matrix cannot be multiplied by state vector"
         self.constraint_size = k
         self.G = G
+
+        g = np.zeros(self.state_size).ravel() if g is None else g.ravel()
 
         if F is None:
             print("Constraint Jacobian matrix not specified, setting to zero ...")
@@ -45,6 +49,7 @@ class BaseConstraint(LinearStateSpaceModel):
         T = np.eye(self.state_size) - self.F @ (np.linalg.pinv(self.G @ self.F)) @ self.G
         self.A = T @ self.A  # Ac in paper, Equation 3
         self.B = T @ self.B  # Bc in paper, Equation 4
+        self.g = T @ g
 
         self.state_size = A.shape[0]
         self.control_size = B.shape[1]
@@ -65,7 +70,8 @@ class BaseConstraint(LinearStateSpaceModel):
     #
     #     states = self.states if (states is None) else states
     #
-    #     result = (self.C @ states) + (self.D @ self.controller) - (self.C @ self.R.T @ np.asarray([self.zeta for _ in states.T]).T)
+    #     result = (self.C @ states) + (self.D @ self.controller) /
+    #     - (self.C @ self.R.T @ np.asarray([self.zeta for _ in states.T]).T)
     #     self.output_states = result
     #     return result
 
@@ -77,28 +83,66 @@ class BaseConstraint(LinearStateSpaceModel):
         result = (self.C @ self.N.T @ z_states) + (self.D @ self.controller)
         return result
 
-    def plot_states(self, title=()):
+    def plot_states(self, title=(), state_name="z-state", width=None, height=None):
         go.Figure(
             data=[
-                go.Scatter(x=self.time, y=values, mode='lines', name=f"z-state [{i}]")
-                for (i, values) in enumerate(self.z_states)
-            ] + [
-                go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px'))
-                for (i, values) in enumerate(self.N @ self.x_desired)
-            ],
+                     go.Scatter(x=self.time, y=values, mode='lines', name=f"{state_name}[{i}]",
+                                marker_color=px.colors.qualitative.Dark24[i])
+                     for (i, values) in enumerate(self.z_states)
+                 ] + [
+                     go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px'),
+                                name=f"desired [{i}]", marker_color=px.colors.qualitative.Dark24[i])
+                     for (i, values) in enumerate(self.N @ self.x_desired)
+                 ],
             layout=go.Layout(showlegend=True, title=dict(text="z states", x=0.5), legend=dict(orientation='h'),
-                             xaxis=dict(title='time'), yaxis=dict(title='z - states'))
+                             xaxis=dict(title='time'), yaxis=dict(title='z - states'), width=width, height=height)
+        ).show()
+
+    def plot_x_states(self, title=(), interest=None):
+        go.Figure(
+            data=[
+                     go.Scatter(x=self.time, y=values, mode='lines', name=f"x-state [{i}]",
+                                marker_color=px.colors.qualitative.Dark24[i%24])
+                     for (i, values) in enumerate(self.states if interest is None else self.states[interest[0]:interest[1]])
+                 ] +
+                 [
+                     go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px'),
+                                name=f"desired [{i}]", marker_color=px.colors.qualitative.Dark24[i%24])
+                     for (i, values) in enumerate(self.x_desired)
+                 ],
+            layout=go.Layout(showlegend=False, title=dict(text="x states", x=0.5), legend=dict(orientation='h'),
+                             xaxis=dict(title='time'), yaxis=dict(title='x - states'))
+        ).show()
+
+    def plot_d_states(self, title=()):
+        go.Figure(
+            data=[
+                     go.Scatter(x=self.time, y=values, mode='lines', name=f"dz-state [{i}]",
+                                marker_color=px.colors.qualitative.Dark24[i%24])
+                     for (i, values) in enumerate(self.dz_states)
+                 ] + [
+                     go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px'),
+                                name=f"desired [{i}]",
+                                marker_color=px.colors.qualitative.Dark24[i%24])
+                     for (i, values) in enumerate(self.N @ self.dx_desired)
+                 ],
+            layout=go.Layout(showlegend=True, title=dict(text="dz states", x=0.5), legend=dict(orientation='h'),
+                             xaxis=dict(title='time'), yaxis=dict(title='dz - states'))
         ).show()
 
     def plot_z_output(self, title=()):
+        z_out = self.z_output()
         go.Figure(
             data=[
-                go.Scatter(x=self.time, y=values, mode='lines', name=f"z-state [{i}]")
-                for (i, values) in enumerate(self.z_output())
-            ] + [
-                go.Scatter(x=self.time, y=values, line=dict(width=2, dash='5px'), name=f"desired [{i}]")
-                for (i, values) in enumerate(self.z_output(np.asarray([self.N @ self.x_desired for _ in self.time]).T))
-            ],
+                     go.Scatter(x=self.time, y=values, mode='lines', name=f"z-state [{i}]",
+                                marker_color=px.colors.qualitative.Dark24[i%24])
+                     for (i, values) in enumerate(z_out)
+                 ] + [
+                     go.Scatter(x=self.time, y=values, line=dict(width=2, dash='5px'), name=f"desired [{i}]",
+                                marker_color=px.colors.qualitative.Dark24[i%24])
+                     for (i, values) in
+                     enumerate(self.z_output(np.asarray([self.N @ self.x_desired for _ in self.time]).T))
+                 ],
             layout=go.Layout(showlegend=True, title=dict(text="z output states", x=0.5), legend=dict(orientation='h'),
                              xaxis=dict(title='time'), yaxis=dict(title='z - states'))
         ).show()
@@ -128,7 +172,7 @@ class BaseConstraint(LinearStateSpaceModel):
                 row=1, col=2
             )
 
-        for values in self.x_desired:
+        for values in self.dx_desired:
             fig.add_trace(
                 go.Scatter(x=self.time, y=[values for _ in self.time], line=dict(width=2, dash='5px')),
                 row=1, col=2

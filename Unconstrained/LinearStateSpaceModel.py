@@ -1,6 +1,7 @@
 import numpy as np
 from control import lqr
 import plotly.graph_objects as go
+import plotly.express as px
 from scipy.integrate import odeint
 from typing import Dict, Any, Optional
 from plotly.subplots import make_subplots
@@ -41,8 +42,8 @@ class LinearStateSpaceModel:
         # Initial state of the system
         self.init_state: Optional[np.ndarray] = np.zeros(self.state_size) if (init_state is None) else init_state
 
-        self.x_desired = np.zeros(self.state_size) if (x_desired is None) else x_desired.ravel()
-        self.dx_desired = np.zeros(self.state_size) if (dx_desired is None) else dx_desired.ravel()
+        self.x_desired = np.zeros(self.state_size) if (x_desired is None) else x_desired.flatten()
+        self.dx_desired = np.zeros(self.state_size) if (dx_desired is None) else dx_desired.flatten()
 
         self.states: Optional[np.ndarray] = None  # Holds values of state after simulation with odeint
         self.d_states: Optional[np.ndarray] = None  # Holds values of state derivative after simulation with odeint
@@ -161,10 +162,12 @@ class LinearStateSpaceModel:
     def plot_output(self, title="Output Plot"):
         go.Figure(
             data=[
-                     go.Scatter(x=self.time, y=output, mode="lines", name=f'output state [{i + 1}]')
+                     go.Scatter(x=self.time, y=output, mode="lines", name=f'output state [{i + 1}]',
+                           marker_color=px.colors.qualitative.Dark24[i])
                      for (i, output) in enumerate(self.output_states)
                  ] + [
-                     go.Scatter(x=self.time, y=values, line=dict(width=2, dash='5px'), name=f'desired [{i + 1}]')
+                     go.Scatter(x=self.time, y=values, line=dict(width=2, dash='5px'), name=f'desired [{i + 1}]',
+                           marker_color=px.colors.qualitative.Dark24[i])
                      for (i, values) in enumerate(self.output(np.asarray([self.x_desired for _ in self.time]).T))
                  ],
             layout=go.Layout(showlegend=True, title=dict(text=title, x=0.5), legend=dict(orientation='h'),

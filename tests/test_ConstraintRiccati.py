@@ -35,6 +35,7 @@ class TestRiccatiEquation(TestCase):
         system.ext_u0 = True
         system.ode_solve(time_space=np.linspace(0, 15, int(2E3)))
         system.plot_states()
+        system.plot_x_states()
         # system.plot_output()
         # system.plot_overview()
         # system.plot_controller()

@@ -83,14 +83,18 @@ class TestOrthogonalDecomposition(TestCase):
 
     def test_decomposing_vector_into_row_and_null_space(self):
         G = np.array([[1, 4, 2, 1], [3, 3, 1, 2], [0, 1, 0, 4]])
-        x_ = 10 * np.random.randn(4)
+        x_dot = 10 * np.random.randn(4)
         R, _, _, N = subspaces_from_svd(G)
 
-        z_ = N @ x_
-        zeta = R @ x_
+        z_ = N @ x_dot
+        zeta = R @ x_dot
+
+        print(x_dot)
+        print(N.T @ z_)
+        print(R.T @ zeta)
 
         assert_almost_equal(
-            x_,
+            x_dot,
             (N.T @ z_) + (R.T @ zeta)
         )
 
